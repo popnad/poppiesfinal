@@ -40,15 +40,6 @@ const Interface = () => {
     handleInsufficientFundsRefresh
   } = useBlockchainGame();
 
-  console.log('🎯 Interface Debug - DETAILED:', {
-    showInsufficientFunds,
-    insufficientFundsData,
-    walletAddress,
-    authenticated,
-    shouldShowPopup: showInsufficientFunds && insufficientFundsData && walletAddress,
-    popupComponent: showInsufficientFunds && insufficientFundsData && walletAddress ? 'SHOULD RENDER' : 'NOT RENDERING'
-  });
-
   return (
     <>
       {/* Wallet Widget - Top Right */}
@@ -60,41 +51,15 @@ const Interface = () => {
       {/* Modal */}
       {modal && <Modal />}
 
-      {/* Insufficient Funds Popup - HIGHEST PRIORITY - ALWAYS RENDER WHEN CONDITIONS MET */}
+      {/* Insufficient Funds Popup */}
       {showInsufficientFunds && insufficientFundsData && walletAddress && (
-        <>
-          {console.log('🚨 RENDERING INSUFFICIENT FUNDS POPUP!', {
-            walletAddress,
-            currentBalance: insufficientFundsData.currentBalance,
-            requiredAmount: insufficientFundsData.requiredAmount
-          })}
-          <InsufficientFundsPopup
-            walletAddress={walletAddress}
-            currentBalance={insufficientFundsData.currentBalance}
-            requiredAmount={insufficientFundsData.requiredAmount}
-            onRefresh={handleInsufficientFundsRefresh}
-            onClose={handleInsufficientFundsClose}
-          />
-        </>
-      )}
-
-      {/* Debug info for popup state */}
-      {showInsufficientFunds && (
-        <div style={{
-          position: 'fixed',
-          top: '100px',
-          left: '10px',
-          background: 'red',
-          color: 'white',
-          padding: '10px',
-          zIndex: 9999,
-          fontSize: '12px',
-          borderRadius: '5px'
-        }}>
-          🚨 POPUP STATE: {showInsufficientFunds ? 'TRUE' : 'FALSE'}<br/>
-          📊 DATA: {insufficientFundsData ? 'EXISTS' : 'NULL'}<br/>
-          👤 WALLET: {walletAddress ? 'EXISTS' : 'NULL'}
-        </div>
+        <InsufficientFundsPopup
+          walletAddress={walletAddress}
+          currentBalance={insufficientFundsData.currentBalance}
+          requiredAmount={insufficientFundsData.requiredAmount}
+          onRefresh={handleInsufficientFundsRefresh}
+          onClose={handleInsufficientFundsClose}
+        />
       )}
 
       {/* Outcome Popup */}

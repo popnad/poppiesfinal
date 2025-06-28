@@ -126,7 +126,6 @@ const SlotMachine = forwardRef(({ value }: SlotMachineProps, ref) => {
 
   // Function to show insufficient funds popup manually
   const showInsufficientFundsPopup = () => {
-    console.log('🚨 Showing insufficient funds popup');
     const spinCost = freeSpins > 0 ? 0 : (hasDiscount && discountedSpins > 0) ? 0.01 : 0.1;
     const gasEstimate = 1; // Rough estimate for display
     const requiredAmount = freeSpins > 0 ? `~${gasEstimate} MON (gas only)` : 
@@ -137,12 +136,6 @@ const SlotMachine = forwardRef(({ value }: SlotMachineProps, ref) => {
       requiredAmount: requiredAmount
     });
     setShowInsufficientFunds(true);
-    
-    console.log('🚨 Popup state set:', {
-      currentBalance: monBalance || '0',
-      requiredAmount: requiredAmount,
-      showInsufficientFunds: true
-    });
   };
 
   useEffect(() => {
@@ -208,15 +201,6 @@ const SlotMachine = forwardRef(({ value }: SlotMachineProps, ref) => {
       const hasSufficientFunds = await checkSufficientFunds();
       setCanSpin(hasSufficientFunds);
       setHasInsufficientFunds(!hasSufficientFunds);
-      
-      console.log('🎯 Button state update:', {
-        authenticated,
-        gameState,
-        showInsufficientFunds,
-        hasSufficientFunds,
-        canSpin: hasSufficientFunds,
-        hasInsufficientFunds: !hasSufficientFunds
-      });
     };
     
     updateCanSpin();
@@ -243,14 +227,6 @@ const SlotMachine = forwardRef(({ value }: SlotMachineProps, ref) => {
 
   // Handle button click
   const handleButtonClick = async () => {
-    console.log('🎯 Button clicked!', {
-      authenticated,
-      gameState,
-      showInsufficientFunds,
-      hasInsufficientFunds,
-      canSpin
-    });
-
     if (!authenticated) {
       console.log('❌ Not authenticated');
       return;
@@ -277,16 +253,6 @@ const SlotMachine = forwardRef(({ value }: SlotMachineProps, ref) => {
 
   // Button is clickable if authenticated and either can spin OR has insufficient funds
   const isButtonClickable = authenticated && (canSpin || hasInsufficientFunds) && !showInsufficientFunds && gameState === 'idle';
-
-  console.log('🎯 SlotMachine render:', {
-    authenticated,
-    gameState,
-    showInsufficientFunds,
-    hasInsufficientFunds,
-    canSpin,
-    isButtonClickable,
-    buttonText: getButtonText()
-  });
 
   return (
     <>
