@@ -56,7 +56,13 @@ const SlotMachine = forwardRef(({ value }: SlotMachineProps, ref) => {
     authenticated, 
     getSpinCost,
     checkSufficientFunds,
-    showInsufficientFunds
+    showInsufficientFunds,
+    setShowInsufficientFunds,
+    setInsufficientFundsData,
+    monBalance,
+    freeSpins,
+    hasDiscount,
+    discountedSpins
   } = useBlockchainGame();
 
   const reelRefs = [
@@ -117,6 +123,20 @@ const SlotMachine = forwardRef(({ value }: SlotMachineProps, ref) => {
     }
   };
 
+  // Function to show insufficient funds popup manually
+  const showInsufficientFundsPopup = async () => {
+    const spinCost = freeSpins > 0 ? 0 : (hasDiscount && discountedSpins > 0) ? 0.01 : 0.1;
+    const gasEstimate = 1; // Rough estimate for display
+    const requiredAmount = freeSpins > 0 ? `~${gasEstimate} MON (gas only)` : 
+                         `~${(spinCost + gasEstimate).toFixed(2)} MON (${spinCost} + gas)`;
+    
+    setInsufficientFundsData({
+      currentBalance: monBalance || '0',
+      requiredAmount: requiredAmount
+    });
+    setShowInsufficientFunds(true);
+  };
+
   useEffect(() => {
     const handleKeyDown = async (event: KeyboardEvent) => {
       if (event.code === 'Space' && gameState === 'idle' && authenticated && !showInsufficientFunds) {
@@ -124,6 +144,8 @@ const SlotMachine = forwardRef(({ value }: SlotMachineProps, ref) => {
         const hasSufficientFunds = await checkSufficientFunds();
         if (hasSufficientFunds) {
           spinSlotMachine();
+        } else {
+          showInsufficientFundsPopup();
         }
       }
     };
@@ -164,21 +186,24 @@ const SlotMachine = forwardRef(({ value }: SlotMachineProps, ref) => {
 
   // Can only spin when idle, authenticated, has sufficient funds, and no insufficient funds popup is showing
   const [canSpin, setCanSpin] = useState(false);
+  const [hasInsufficientFunds, setHasInsufficientFunds] = useState(false);
 
   // Update canSpin state when dependencies change
   useEffect(() => {
     const updateCanSpin = async () => {
       if (!authenticated || gameState !== 'idle' || showInsufficientFunds) {
         setCanSpin(false);
+        setHasInsufficientFunds(false);
         return;
       }
       
       const hasSufficientFunds = await checkSufficientFunds();
       setCanSpin(hasSufficientFunds);
+      setHasInsufficientFunds(!hasSufficientFunds);
     };
     
     updateCanSpin();
-  }, [authenticated, gameState, showInsufficientFunds, checkSufficientFunds]);
+  }, [authenticated, gameState, showInsufficientFunds, checkSufficientFunds, monBalance]);
 
   // Button text based on game state
   const getButtonText = () => {
@@ -186,7 +211,7 @@ const SlotMachine = forwardRef(({ value }: SlotMachineProps, ref) => {
     
     if (showInsufficientFunds) return 'FUND WALLET';
     
-    if (!canSpin && gameState === 'idle') return 'INSUFFICIENT FUNDS';
+    if (hasInsufficientFunds && gameState === 'idle') return 'INSUFFICIENT FUNDS';
     
     switch (gameState) {
       case 'spinning':
@@ -198,6 +223,32 @@ const SlotMachine = forwardRef(({ value }: SlotMachineProps, ref) => {
         return `SPIN (${getSpinCost()})`;
     }
   };
+
+  // Handle button click
+  const handleButtonClick = async () => {
+    if (!authenticated) {
+      console.log('❌ Not authenticated');
+      return;
+    }
+
+    if (showInsufficientFunds || gameState !== 'idle') {
+      return;
+    }
+
+    // If insufficient funds, show popup instead of spinning
+    if (hasInsufficientFunds) {
+      showInsufficientFundsPopup();
+      return;
+    }
+
+    // If sufficient funds, proceed with spin
+    if (canSpin) {
+      spinSlotMachine();
+    }
+  };
+
+  // Button is clickable if authenticated and either can spin OR has insufficient funds
+  const isButtonClickable = authenticated && (canSpin || hasInsufficientFunds) && !showInsufficientFunds && gameState === 'idle';
 
   return (
     <>
@@ -232,13 +283,9 @@ const SlotMachine = forwardRef(({ value }: SlotMachineProps, ref) => {
         scale={[0.055, 0.045, 0.045]}
         position={[0, buttonY, buttonZ]}
         rotation={[-Math.PI / 8, 0, 0]}
-        onClick={() => {
-          if (canSpin) {
-            spinSlotMachine();
-          }
-        }}
+        onClick={handleButtonClick}
         onPointerDown={() => {
-          if (canSpin) {
+          if (isButtonClickable) {
             setButtonZ(-1);
             setButtonY(-13.5);
           }
@@ -249,7 +296,7 @@ const SlotMachine = forwardRef(({ value }: SlotMachineProps, ref) => {
         }}
       />
       <Text
-        color={canSpin ? "white" : "#888"}
+        color={isButtonClickable ? "white" : "#888"}
         anchorX="center"
         anchorY="middle"
         position={[0, textY, textZ]}
@@ -257,7 +304,7 @@ const SlotMachine = forwardRef(({ value }: SlotMachineProps, ref) => {
         fontSize={3}
         font="./fonts/nickname.otf"
         onPointerDown={() => {
-          if (canSpin) {
+          if (isButtonClickable) {
             setTextZ(1.3);
             setTextY(-14.1);
           }
