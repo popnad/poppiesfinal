@@ -40,11 +40,13 @@ const Interface = () => {
     handleInsufficientFundsRefresh
   } = useBlockchainGame();
 
-  console.log('🎯 Interface Debug:', {
+  console.log('🎯 Interface Debug - DETAILED:', {
     showInsufficientFunds,
     insufficientFundsData,
     walletAddress,
-    authenticated
+    authenticated,
+    shouldShowPopup: showInsufficientFunds && insufficientFundsData && walletAddress,
+    popupComponent: showInsufficientFunds && insufficientFundsData && walletAddress ? 'SHOULD RENDER' : 'NOT RENDERING'
   });
 
   return (
@@ -58,15 +60,41 @@ const Interface = () => {
       {/* Modal */}
       {modal && <Modal />}
 
-      {/* Insufficient Funds Popup - HIGHEST PRIORITY */}
+      {/* Insufficient Funds Popup - HIGHEST PRIORITY - ALWAYS RENDER WHEN CONDITIONS MET */}
       {showInsufficientFunds && insufficientFundsData && walletAddress && (
-        <InsufficientFundsPopup
-          walletAddress={walletAddress}
-          currentBalance={insufficientFundsData.currentBalance}
-          requiredAmount={insufficientFundsData.requiredAmount}
-          onRefresh={handleInsufficientFundsRefresh}
-          onClose={handleInsufficientFundsClose}
-        />
+        <>
+          {console.log('🚨 RENDERING INSUFFICIENT FUNDS POPUP!', {
+            walletAddress,
+            currentBalance: insufficientFundsData.currentBalance,
+            requiredAmount: insufficientFundsData.requiredAmount
+          })}
+          <InsufficientFundsPopup
+            walletAddress={walletAddress}
+            currentBalance={insufficientFundsData.currentBalance}
+            requiredAmount={insufficientFundsData.requiredAmount}
+            onRefresh={handleInsufficientFundsRefresh}
+            onClose={handleInsufficientFundsClose}
+          />
+        </>
+      )}
+
+      {/* Debug info for popup state */}
+      {showInsufficientFunds && (
+        <div style={{
+          position: 'fixed',
+          top: '100px',
+          left: '10px',
+          background: 'red',
+          color: 'white',
+          padding: '10px',
+          zIndex: 9999,
+          fontSize: '12px',
+          borderRadius: '5px'
+        }}>
+          🚨 POPUP STATE: {showInsufficientFunds ? 'TRUE' : 'FALSE'}<br/>
+          📊 DATA: {insufficientFundsData ? 'EXISTS' : 'NULL'}<br/>
+          👤 WALLET: {walletAddress ? 'EXISTS' : 'NULL'}
+        </div>
       )}
 
       {/* Outcome Popup */}

@@ -36,10 +36,18 @@ const InsufficientFundsPopup = ({
   const [copied, setCopied] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  console.log('🚨 InsufficientFundsPopup RENDERED!', {
+    walletAddress,
+    currentBalance,
+    requiredAmount
+  });
+
   // Prevent background scrolling when popup is open
   useEffect(() => {
+    console.log('🚨 Popup mounted - preventing body scroll');
     document.body.style.overflow = 'hidden';
     return () => {
+      console.log('🚨 Popup unmounted - restoring body scroll');
       document.body.style.overflow = 'unset';
     };
   }, []);
@@ -48,6 +56,7 @@ const InsufficientFundsPopup = ({
   useEffect(() => {
     const handleEsc = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        console.log('🚨 ESC pressed - closing popup');
         onClose();
       }
     };
@@ -60,6 +69,7 @@ const InsufficientFundsPopup = ({
       await navigator.clipboard.writeText(walletAddress);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+      console.log('📋 Address copied to clipboard');
     } catch (err) {
       console.error('Failed to copy address:', err);
       // Fallback for older browsers
@@ -71,25 +81,33 @@ const InsufficientFundsPopup = ({
       document.body.removeChild(textArea);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+      console.log('📋 Address copied to clipboard (fallback)');
     }
   };
 
   const handleRefresh = async () => {
+    console.log('🔄 Refreshing balance...');
     setIsRefreshing(true);
     await onRefresh();
     setIsRefreshing(false);
+    console.log('✅ Balance refresh complete');
+  };
+
+  const handleClose = () => {
+    console.log('❌ Closing popup manually');
+    onClose();
   };
 
   const explorerUrl = `${MONAD_TESTNET.blockExplorers.default.url}/address/${walletAddress}`;
 
   return (
-    <div className="insufficient-funds-popup" onClick={onClose}>
+    <div className="insufficient-funds-popup" onClick={handleClose}>
       <div className="insufficient-funds-popup-box" onClick={(e) => e.stopPropagation()}>
         <div className="insufficient-funds-popup-main">
           {/* Close button */}
           <button 
             className="insufficient-funds-close-btn" 
-            onClick={onClose}
+            onClick={handleClose}
           >
             ✕
           </button>
@@ -156,7 +174,7 @@ const InsufficientFundsPopup = ({
             >
               {isRefreshing ? '🔄 Checking...' : '🔄 Check Balance'}
             </button>
-            <button className="close-btn" onClick={onClose}>
+            <button className="close-btn" onClick={handleClose}>
               Close
             </button>
           </div>
