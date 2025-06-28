@@ -90,7 +90,8 @@ const SlotMachine = forwardRef(({ value }: SlotMachineProps, ref) => {
     // Check for sufficient funds before spinning (async check)
     const hasSufficientFunds = await checkSufficientFunds();
     if (!hasSufficientFunds) {
-      console.log('❌ Insufficient funds - popup will be shown by blockchain hook');
+      console.log('❌ Insufficient funds - showing popup');
+      showInsufficientFundsPopup();
       return;
     }
 
@@ -124,7 +125,8 @@ const SlotMachine = forwardRef(({ value }: SlotMachineProps, ref) => {
   };
 
   // Function to show insufficient funds popup manually
-  const showInsufficientFundsPopup = async () => {
+  const showInsufficientFundsPopup = () => {
+    console.log('🚨 Showing insufficient funds popup');
     const spinCost = freeSpins > 0 ? 0 : (hasDiscount && discountedSpins > 0) ? 0.01 : 0.1;
     const gasEstimate = 1; // Rough estimate for display
     const requiredAmount = freeSpins > 0 ? `~${gasEstimate} MON (gas only)` : 
@@ -135,6 +137,12 @@ const SlotMachine = forwardRef(({ value }: SlotMachineProps, ref) => {
       requiredAmount: requiredAmount
     });
     setShowInsufficientFunds(true);
+    
+    console.log('🚨 Popup state set:', {
+      currentBalance: monBalance || '0',
+      requiredAmount: requiredAmount,
+      showInsufficientFunds: true
+    });
   };
 
   useEffect(() => {
@@ -200,6 +208,15 @@ const SlotMachine = forwardRef(({ value }: SlotMachineProps, ref) => {
       const hasSufficientFunds = await checkSufficientFunds();
       setCanSpin(hasSufficientFunds);
       setHasInsufficientFunds(!hasSufficientFunds);
+      
+      console.log('🎯 Button state update:', {
+        authenticated,
+        gameState,
+        showInsufficientFunds,
+        hasSufficientFunds,
+        canSpin: hasSufficientFunds,
+        hasInsufficientFunds: !hasSufficientFunds
+      });
     };
     
     updateCanSpin();
@@ -226,29 +243,50 @@ const SlotMachine = forwardRef(({ value }: SlotMachineProps, ref) => {
 
   // Handle button click
   const handleButtonClick = async () => {
+    console.log('🎯 Button clicked!', {
+      authenticated,
+      gameState,
+      showInsufficientFunds,
+      hasInsufficientFunds,
+      canSpin
+    });
+
     if (!authenticated) {
       console.log('❌ Not authenticated');
       return;
     }
 
     if (showInsufficientFunds || gameState !== 'idle') {
+      console.log('❌ Cannot click: popup showing or not idle');
       return;
     }
 
     // If insufficient funds, show popup instead of spinning
     if (hasInsufficientFunds) {
+      console.log('🚨 Insufficient funds detected - showing popup');
       showInsufficientFundsPopup();
       return;
     }
 
     // If sufficient funds, proceed with spin
     if (canSpin) {
+      console.log('✅ Sufficient funds - spinning');
       spinSlotMachine();
     }
   };
 
   // Button is clickable if authenticated and either can spin OR has insufficient funds
   const isButtonClickable = authenticated && (canSpin || hasInsufficientFunds) && !showInsufficientFunds && gameState === 'idle';
+
+  console.log('🎯 SlotMachine render:', {
+    authenticated,
+    gameState,
+    showInsufficientFunds,
+    hasInsufficientFunds,
+    canSpin,
+    isButtonClickable,
+    buttonText: getButtonText()
+  });
 
   return (
     <>

@@ -40,6 +40,13 @@ const Interface = () => {
     handleInsufficientFundsRefresh
   } = useBlockchainGame();
 
+  console.log('🎯 Interface Debug:', {
+    showInsufficientFunds,
+    insufficientFundsData,
+    walletAddress,
+    authenticated
+  });
+
   return (
     <>
       {/* Wallet Widget - Top Right */}
@@ -51,7 +58,7 @@ const Interface = () => {
       {/* Modal */}
       {modal && <Modal />}
 
-      {/* Insufficient Funds Popup */}
+      {/* Insufficient Funds Popup - HIGHEST PRIORITY */}
       {showInsufficientFunds && insufficientFundsData && walletAddress && (
         <InsufficientFundsPopup
           walletAddress={walletAddress}
@@ -85,7 +92,7 @@ const Interface = () => {
         {/* Coins - Show blockchain balance if authenticated, otherwise local coins */}
         <div className="coins-section">
           <div className="coins-number">
-            {authenticated ? parseFloat(monBalance).toFixed(2) : coins}
+            {authenticated ? parseFloat(monBalance || '0').toFixed(2) : coins}
           </div>
           <img className="coins-image" src="./images/coin.png" />
         </div>
