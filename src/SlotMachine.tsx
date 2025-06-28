@@ -81,9 +81,10 @@ const SlotMachine = forwardRef(({ value }: SlotMachineProps, ref) => {
       return;
     }
 
-    // Check for sufficient funds before spinning
-    if (!checkSufficientFunds()) {
-      console.log('❌ Insufficient funds - popup will be shown');
+    // Check for sufficient funds before spinning (async check)
+    const hasSufficientFunds = await checkSufficientFunds();
+    if (!hasSufficientFunds) {
+      console.log('❌ Insufficient funds - popup will be shown by blockchain hook');
       return;
     }
 
@@ -117,16 +118,19 @@ const SlotMachine = forwardRef(({ value }: SlotMachineProps, ref) => {
   };
 
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.code === 'Space' && gameState === 'idle' && authenticated && checkSufficientFunds() && !showInsufficientFunds) {
+    const handleKeyDown = async (event: KeyboardEvent) => {
+      if (event.code === 'Space' && gameState === 'idle' && authenticated && !showInsufficientFunds) {
         event.preventDefault();
-        spinSlotMachine();
+        const hasSufficientFunds = await checkSufficientFunds();
+        if (hasSufficientFunds) {
+          spinSlotMachine();
+        }
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [gameState, authenticated, checkSufficientFunds, showInsufficientFunds]);
+  }, [gameState, authenticated, showInsufficientFunds, checkSufficientFunds]);
 
   // Reel animation - just for visual effect, doesn't affect outcome
   useFrame(() => {
@@ -159,7 +163,22 @@ const SlotMachine = forwardRef(({ value }: SlotMachineProps, ref) => {
   const [textY, setTextY] = useState(-14);
 
   // Can only spin when idle, authenticated, has sufficient funds, and no insufficient funds popup is showing
-  const canSpin = authenticated && gameState === 'idle' && checkSufficientFunds() && !showInsufficientFunds;
+  const [canSpin, setCanSpin] = useState(false);
+
+  // Update canSpin state when dependencies change
+  useEffect(() => {
+    const updateCanSpin = async () => {
+      if (!authenticated || gameState !== 'idle' || showInsufficientFunds) {
+        setCanSpin(false);
+        return;
+      }
+      
+      const hasSufficientFunds = await checkSufficientFunds();
+      setCanSpin(hasSufficientFunds);
+    };
+    
+    updateCanSpin();
+  }, [authenticated, gameState, showInsufficientFunds, checkSufficientFunds]);
 
   // Button text based on game state
   const getButtonText = () => {
@@ -167,7 +186,7 @@ const SlotMachine = forwardRef(({ value }: SlotMachineProps, ref) => {
     
     if (showInsufficientFunds) return 'FUND WALLET';
     
-    if (!checkSufficientFunds()) return 'INSUFFICIENT FUNDS';
+    if (!canSpin && gameState === 'idle') return 'INSUFFICIENT FUNDS';
     
     switch (gameState) {
       case 'spinning':

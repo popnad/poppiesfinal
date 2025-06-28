@@ -224,25 +224,37 @@ export function useBlockchainGame() {
     fetchState();
   }, [fetchState]);
 
-  // Check if user has sufficient funds for spinning
-  const checkSufficientFunds = useCallback(() => {
-    if (!monBalance || !authenticated) return false;
+  // Check if user has sufficient funds for spinning (with realistic gas estimation)
+  const checkSufficientFunds = useCallback(async () => {
+    if (!monBalance || !authenticated || !provider) return false;
     
     const balance = parseFloat(monBalance);
-    let requiredAmount = 0.1; // Default spin cost
+    let spinCost = 0.1; // Default spin cost
     
     if (freeSpins > 0) {
-      requiredAmount = 0; // Free spin
+      spinCost = 0; // Free spin
     } else if (hasDiscount && discountedSpins > 0) {
-      requiredAmount = 0.01; // Discounted spin
+      spinCost = 0.01; // Discounted spin
     }
     
-    // Add some buffer for gas fees (approximately 0.01 MON)
-    const gasBuffer = 0.01;
-    const totalRequired = requiredAmount + gasBuffer;
+    // Calculate realistic gas cost for Monad testnet
+    // Gas limit: 1,000,000, Max fee: 1000 gwei = very expensive!
+    const gasLimit = 1000000;
+    const maxFeePerGas = ethers.parseUnits('1000', 'gwei'); // 1000 gwei
+    const estimatedGasCost = parseFloat(ethers.formatEther(gasLimit * maxFeePerGas));
+    
+    const totalRequired = spinCost + estimatedGasCost;
+    
+    console.log('💰 Fund check:', {
+      balance: balance.toFixed(6),
+      spinCost: spinCost.toFixed(6),
+      estimatedGasCost: estimatedGasCost.toFixed(6),
+      totalRequired: totalRequired.toFixed(6),
+      sufficient: balance >= totalRequired
+    });
     
     return balance >= totalRequired;
-  }, [monBalance, freeSpins, hasDiscount, discountedSpins, authenticated]);
+  }, [monBalance, freeSpins, hasDiscount, discountedSpins, authenticated, provider]);
 
   // REAL blockchain spin function
   const spin = useCallback(async () => {
@@ -257,9 +269,12 @@ export function useBlockchainGame() {
     }
     
     // Check for sufficient funds before attempting spin
-    if (!checkSufficientFunds()) {
-      const requiredAmount = freeSpins > 0 ? '0 MON (Free)' : 
-                           (hasDiscount && discountedSpins > 0) ? '0.01 MON + gas' : '0.1 MON + gas';
+    const hasSufficientFunds = await checkSufficientFunds();
+    if (!hasSufficientFunds) {
+      const spinCost = freeSpins > 0 ? 0 : (hasDiscount && discountedSpins > 0) ? 0.01 : 0.1;
+      const gasEstimate = 1; // Rough estimate for display
+      const requiredAmount = freeSpins > 0 ? `~${gasEstimate} MON (gas only)` : 
+                           `~${(spinCost + gasEstimate).toFixed(2)} MON (${spinCost} + gas)`;
       
       setInsufficientFundsData({
         currentBalance: monBalance,
@@ -369,8 +384,10 @@ export function useBlockchainGame() {
       console.error('❌ Blockchain spin failed:', error);
       
       if (error.code === 'INSUFFICIENT_FUNDS' || error.message?.includes('insufficient funds')) {
-        const requiredAmount = freeSpins > 0 ? '0 MON (Free)' : 
-                             (hasDiscount && discountedSpins > 0) ? '0.01 MON + gas' : '0.1 MON + gas';
+        const spinCost = freeSpins > 0 ? 0 : (hasDiscount && discountedSpins > 0) ? 0.01 : 0.1;
+        const gasEstimate = 1; // Rough estimate for display
+        const requiredAmount = freeSpins > 0 ? `~${gasEstimate} MON (gas only)` : 
+                             `~${(spinCost + gasEstimate).toFixed(2)} MON (${spinCost} + gas)`;
         
         setInsufficientFundsData({
           currentBalance: monBalance,
@@ -402,7 +419,8 @@ export function useBlockchainGame() {
     await fetchState();
     
     // Check if funds are now sufficient
-    if (checkSufficientFunds()) {
+    const hasSufficientFunds = await checkSufficientFunds();
+    if (hasSufficientFunds) {
       setShowInsufficientFunds(false);
       setInsufficientFundsData(null);
     }
