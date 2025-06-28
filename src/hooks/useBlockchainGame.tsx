@@ -239,9 +239,12 @@ export function useBlockchainGame() {
     
     // Calculate realistic gas cost for Monad testnet
     // Gas limit: 1,000,000, Max fee: 1000 gwei = very expensive!
-    const gasLimit = 1000000;
-    const maxFeePerGas = ethers.parseUnits('1000', 'gwei'); // 1000 gwei
-    const estimatedGasCost = parseFloat(ethers.formatEther(gasLimit * maxFeePerGas));
+    const gasLimit = BigInt(1000000);
+    const maxFeePerGas = ethers.parseUnits('1000', 'gwei'); // This returns BigInt
+    
+    // ✅ Fix: Convert BigInt to number properly for calculation
+    const estimatedGasCostWei = gasLimit * maxFeePerGas;
+    const estimatedGasCost = parseFloat(ethers.formatEther(estimatedGasCostWei));
     
     const totalRequired = spinCost + estimatedGasCost;
     
@@ -277,7 +280,7 @@ export function useBlockchainGame() {
                            `~${(spinCost + gasEstimate).toFixed(2)} MON (${spinCost} + gas)`;
       
       setInsufficientFundsData({
-        currentBalance: monBalance,
+        currentBalance: monBalance || '0',
         requiredAmount: requiredAmount
       });
       setShowInsufficientFunds(true);
@@ -390,7 +393,7 @@ export function useBlockchainGame() {
                              `~${(spinCost + gasEstimate).toFixed(2)} MON (${spinCost} + gas)`;
         
         setInsufficientFundsData({
-          currentBalance: monBalance,
+          currentBalance: monBalance || '0',
           requiredAmount: requiredAmount
         });
         setShowInsufficientFunds(true);
@@ -441,7 +444,9 @@ export function useBlockchainGame() {
     refreshState: fetchState,
     checkSufficientFunds,
     showInsufficientFunds,
+    setShowInsufficientFunds,
     insufficientFundsData,
+    setInsufficientFundsData,
     handleInsufficientFundsClose,
     handleInsufficientFundsRefresh,
   };
