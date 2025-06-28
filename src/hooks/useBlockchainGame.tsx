@@ -83,6 +83,13 @@ export function useBlockchainGame() {
   const [rewardPool, setRewardPool] = useState<string>('0');
   const [networkError, setNetworkError] = useState<boolean>(false);
 
+  // New state for insufficient funds
+  const [showInsufficientFunds, setShowInsufficientFunds] = useState<boolean>(false);
+  const [insufficientFundsData, setInsufficientFundsData] = useState<{
+    currentBalance: string;
+    requiredAmount: string;
+  } | null>(null);
+
   // Gas settings for Monad testnet
   const getDynamicGasSettings = useCallback(async (provider: ethers.BrowserProvider) => {
     try {
@@ -217,6 +224,26 @@ export function useBlockchainGame() {
     fetchState();
   }, [fetchState]);
 
+  // Check if user has sufficient funds for spinning
+  const checkSufficientFunds = useCallback(() => {
+    if (!monBalance || !authenticated) return false;
+    
+    const balance = parseFloat(monBalance);
+    let requiredAmount = 0.1; // Default spin cost
+    
+    if (freeSpins > 0) {
+      requiredAmount = 0; // Free spin
+    } else if (hasDiscount && discountedSpins > 0) {
+      requiredAmount = 0.01; // Discounted spin
+    }
+    
+    // Add some buffer for gas fees (approximately 0.01 MON)
+    const gasBuffer = 0.01;
+    const totalRequired = requiredAmount + gasBuffer;
+    
+    return balance >= totalRequired;
+  }, [monBalance, freeSpins, hasDiscount, discountedSpins, authenticated]);
+
   // REAL blockchain spin function
   const spin = useCallback(async () => {
     if (!contract || !signer || !provider) {
@@ -226,6 +253,19 @@ export function useBlockchainGame() {
     
     if (networkError) {
       console.error('Network connection issues');
+      return null;
+    }
+    
+    // Check for sufficient funds before attempting spin
+    if (!checkSufficientFunds()) {
+      const requiredAmount = freeSpins > 0 ? '0 MON (Free)' : 
+                           (hasDiscount && discountedSpins > 0) ? '0.01 MON + gas' : '0.1 MON + gas';
+      
+      setInsufficientFundsData({
+        currentBalance: monBalance,
+        requiredAmount: requiredAmount
+      });
+      setShowInsufficientFunds(true);
       return null;
     }
     
@@ -328,8 +368,15 @@ export function useBlockchainGame() {
     } catch (error: any) {
       console.error('❌ Blockchain spin failed:', error);
       
-      if (error.code === 'INSUFFICIENT_FUNDS') {
-        console.error('❌ Insufficient MON balance');
+      if (error.code === 'INSUFFICIENT_FUNDS' || error.message?.includes('insufficient funds')) {
+        const requiredAmount = freeSpins > 0 ? '0 MON (Free)' : 
+                             (hasDiscount && discountedSpins > 0) ? '0.01 MON + gas' : '0.1 MON + gas';
+        
+        setInsufficientFundsData({
+          currentBalance: monBalance,
+          requiredAmount: requiredAmount
+        });
+        setShowInsufficientFunds(true);
       } else if (error.code === 'USER_REJECTED') {
         console.error('❌ Transaction cancelled');
       } else if (error.message?.includes('execution reverted')) {
@@ -338,13 +385,28 @@ export function useBlockchainGame() {
       
       return null;
     }
-  }, [contract, signer, provider, freeSpins, hasDiscount, discountedSpins, networkError, fetchState, getDynamicGasSettings]);
+  }, [contract, signer, provider, freeSpins, hasDiscount, discountedSpins, networkError, fetchState, getDynamicGasSettings, checkSufficientFunds, monBalance]);
 
   const getSpinCost = useCallback(() => {
     if (freeSpins > 0) return 'Free';
     if (hasDiscount && discountedSpins > 0) return '0.01 MON';
     return '0.1 MON';
   }, [freeSpins, hasDiscount, discountedSpins]);
+
+  const handleInsufficientFundsClose = useCallback(() => {
+    setShowInsufficientFunds(false);
+    setInsufficientFundsData(null);
+  }, []);
+
+  const handleInsufficientFundsRefresh = useCallback(async () => {
+    await fetchState();
+    
+    // Check if funds are now sufficient
+    if (checkSufficientFunds()) {
+      setShowInsufficientFunds(false);
+      setInsufficientFundsData(null);
+    }
+  }, [fetchState, checkSufficientFunds]);
 
   return {
     ready,
@@ -359,5 +421,10 @@ export function useBlockchainGame() {
     spin,
     getSpinCost,
     refreshState: fetchState,
+    checkSufficientFunds,
+    showInsufficientFunds,
+    insufficientFundsData,
+    handleInsufficientFundsClose,
+    handleInsufficientFundsRefresh,
   };
 }

@@ -20,6 +20,7 @@ import Modal from './modal/Modal';
 import HelpButton from './helpButton/HelpButton';
 import OutcomePopup from './outcomePopup/OutcomePopup';
 import WalletWidget from '../components/WalletWidget';
+import InsufficientFundsPopup from '../components/InsufficientFundsPopup';
 import './style.css';
 
 const Interface = () => {
@@ -29,7 +30,15 @@ const Interface = () => {
   const spins = useGame((state) => state.spins);
   
   // Get blockchain state for display
-  const { monBalance, authenticated } = useBlockchainGame();
+  const { 
+    monBalance, 
+    authenticated, 
+    walletAddress,
+    showInsufficientFunds,
+    insufficientFundsData,
+    handleInsufficientFundsClose,
+    handleInsufficientFundsRefresh
+  } = useBlockchainGame();
 
   return (
     <>
@@ -41,6 +50,17 @@ const Interface = () => {
 
       {/* Modal */}
       {modal && <Modal />}
+
+      {/* Insufficient Funds Popup */}
+      {showInsufficientFunds && insufficientFundsData && walletAddress && (
+        <InsufficientFundsPopup
+          walletAddress={walletAddress}
+          currentBalance={insufficientFundsData.currentBalance}
+          requiredAmount={insufficientFundsData.requiredAmount}
+          onRefresh={handleInsufficientFundsRefresh}
+          onClose={handleInsufficientFundsClose}
+        />
+      )}
 
       {/* Outcome Popup */}
       {outcomePopup && (

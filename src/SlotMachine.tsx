@@ -54,7 +54,9 @@ const SlotMachine = forwardRef(({ value }: SlotMachineProps, ref) => {
   const { 
     spin: blockchainSpin, 
     authenticated, 
-    getSpinCost
+    getSpinCost,
+    checkSufficientFunds,
+    showInsufficientFunds
   } = useBlockchainGame();
 
   const reelRefs = [
@@ -76,6 +78,12 @@ const SlotMachine = forwardRef(({ value }: SlotMachineProps, ref) => {
 
     if (gameState !== 'idle') {
       console.log('❌ Cannot spin: Game state is', gameState);
+      return;
+    }
+
+    // Check for sufficient funds before spinning
+    if (!checkSufficientFunds()) {
+      console.log('❌ Insufficient funds - popup will be shown');
       return;
     }
 
@@ -110,7 +118,7 @@ const SlotMachine = forwardRef(({ value }: SlotMachineProps, ref) => {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.code === 'Space' && gameState === 'idle' && authenticated) {
+      if (event.code === 'Space' && gameState === 'idle' && authenticated && checkSufficientFunds() && !showInsufficientFunds) {
         event.preventDefault();
         spinSlotMachine();
       }
@@ -118,7 +126,7 @@ const SlotMachine = forwardRef(({ value }: SlotMachineProps, ref) => {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [gameState, authenticated]);
+  }, [gameState, authenticated, checkSufficientFunds, showInsufficientFunds]);
 
   // Reel animation - just for visual effect, doesn't affect outcome
   useFrame(() => {
@@ -150,12 +158,16 @@ const SlotMachine = forwardRef(({ value }: SlotMachineProps, ref) => {
   const [textZ, setTextZ] = useState(1.6);
   const [textY, setTextY] = useState(-14);
 
-  // Can only spin when idle and authenticated
-  const canSpin = authenticated && gameState === 'idle';
+  // Can only spin when idle, authenticated, has sufficient funds, and no insufficient funds popup is showing
+  const canSpin = authenticated && gameState === 'idle' && checkSufficientFunds() && !showInsufficientFunds;
 
   // Button text based on game state
   const getButtonText = () => {
     if (!authenticated) return 'CONNECT WALLET';
+    
+    if (showInsufficientFunds) return 'FUND WALLET';
+    
+    if (!checkSufficientFunds()) return 'INSUFFICIENT FUNDS';
     
     switch (gameState) {
       case 'spinning':

@@ -1,0 +1,340 @@
+.insufficient-funds-popup {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 3000; /* Higher than outcome popup */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(31, 31, 31, 0.95);
+  backdrop-filter: blur(10px);
+}
+
+.insufficient-funds-popup-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+  width: min(95vw, 600px);
+  height: fit-content;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 30px 25px;
+  border-radius: 20px;
+  border: 3px solid #ff4757;
+  z-index: 3001;
+  text-align: center;
+  box-shadow: 0 25px 50px rgba(255, 71, 87, 0.4);
+  position: relative;
+  animation: popupSlideIn 0.5s ease-out;
+}
+
+@keyframes popupSlideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.7) translateY(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.insufficient-funds-popup-main {
+  width: 100%;
+  position: relative;
+}
+
+.insufficient-funds-close-btn {
+  position: absolute;
+  top: -15px;
+  right: -15px;
+  background: #ff4757;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 35px;
+  height: 35px;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(255, 71, 87, 0.4);
+  z-index: 3002;
+}
+
+.insufficient-funds-close-btn:hover {
+  background: #ff3742;
+  transform: scale(1.15);
+  box-shadow: 0 6px 16px rgba(255, 71, 87, 0.6);
+}
+
+.insufficient-funds-title {
+  font-family: 'Paytone One', sans-serif;
+  font-size: min(6vw, 28px);
+  color: #ff4757;
+  margin-bottom: 25px;
+  text-shadow: 2px 2px 4px rgba(255, 71, 87, 0.1);
+}
+
+.balance-info {
+  background: rgba(255, 71, 87, 0.08);
+  border: 2px solid #ff4757;
+  border-radius: 15px;
+  padding: 20px;
+  margin-bottom: 25px;
+}
+
+.balance-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  font-family: 'Inter', sans-serif;
+  font-size: 16px;
+}
+
+.balance-row:last-child {
+  margin-bottom: 0;
+}
+
+.balance-row span:first-child {
+  color: #666;
+  font-weight: 500;
+}
+
+.balance-amount {
+  color: #ff4757;
+  font-weight: bold;
+  font-family: 'Paytone One', sans-serif;
+}
+
+.required-amount {
+  color: #28a745;
+  font-weight: bold;
+  font-family: 'Paytone One', sans-serif;
+}
+
+.funding-instructions {
+  text-align: left;
+  margin-bottom: 25px;
+  padding: 20px;
+  background: rgba(40, 167, 69, 0.08);
+  border: 2px solid #28a745;
+  border-radius: 15px;
+}
+
+.funding-instructions h3 {
+  font-family: 'Paytone One', sans-serif;
+  color: #28a745;
+  margin-bottom: 15px;
+  font-size: 18px;
+  text-align: center;
+}
+
+.funding-instructions ol {
+  font-family: 'Inter', sans-serif;
+  color: #333;
+  font-size: 14px;
+  line-height: 1.6;
+  padding-left: 20px;
+}
+
+.funding-instructions li {
+  margin-bottom: 8px;
+}
+
+.wallet-address-section {
+  margin-bottom: 20px;
+}
+
+.wallet-address-section label {
+  display: block;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+.wallet-address-container {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  background: #f8f9fa;
+  border: 2px solid #dee2e6;
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.wallet-address-display {
+  flex: 1;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  color: #333;
+  word-break: break-all;
+  background: white;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #dee2e6;
+}
+
+.copy-btn {
+  background: #007bff;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  min-width: 80px;
+}
+
+.copy-btn:hover {
+  background: #0056b3;
+  transform: translateY(-1px);
+}
+
+.copy-btn.copied {
+  background: #28a745;
+  transform: scale(1.05);
+}
+
+.explorer-link-section {
+  margin-bottom: 25px;
+  padding-top: 15px;
+  border-top: 2px solid rgba(255, 71, 87, 0.1);
+}
+
+.explorer-link {
+  font-family: 'Inter', sans-serif;
+  color: #3b0873;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 20px;
+  border: 2px solid #3b0873;
+  border-radius: 10px;
+  display: inline-block;
+  transition: all 0.3s ease;
+  background: rgba(59, 8, 115, 0.05);
+}
+
+.explorer-link:hover {
+  background: #3b0873;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(59, 8, 115, 0.4);
+}
+
+.popup-actions {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.refresh-btn {
+  flex: 1;
+  background: #28a745;
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-family: 'Paytone One', sans-serif;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+}
+
+.refresh-btn:hover:not(:disabled) {
+  background: #218838;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+}
+
+.refresh-btn.refreshing {
+  background: #6c757d;
+  cursor: not-allowed;
+  animation: refreshSpin 1s linear infinite;
+}
+
+@keyframes refreshSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.close-btn {
+  flex: 1;
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-family: 'Paytone One', sans-serif;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
+}
+
+.close-btn:hover {
+  background: #545b62;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(108, 117, 125, 0.4);
+}
+
+.help-text {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: #666;
+  font-style: italic;
+  line-height: 1.5;
+  padding: 15px;
+  background: rgba(108, 117, 125, 0.08);
+  border-radius: 10px;
+  border: 1px solid rgba(108, 117, 125, 0.2);
+}
+
+/* Mobile responsiveness */
+@media (max-width: 480px) {
+  .insufficient-funds-popup-box {
+    width: 95vw;
+    padding: 25px 20px;
+  }
+  
+  .wallet-address-container {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .wallet-address-display {
+    font-size: 10px;
+  }
+  
+  .copy-btn {
+    width: 100%;
+  }
+  
+  .popup-actions {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .funding-instructions ol {
+    font-size: 13px;
+  }
+  
+  .insufficient-funds-title {
+    font-size: 24px;
+  }
+}
