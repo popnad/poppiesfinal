@@ -7,11 +7,9 @@ import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 
 contract SlotMachine is Ownable, ReentrancyGuard, IERC1155Receiver {
-    // Poppies NFT Contract (only one NFT type as clarified)
+    // Poppies NFT Contract (Magic Eden)
     IERC1155 public constant POPPIES_NFT = IERC1155(0x96F37136ed9653eb1d2D23cb86C18B8Af870e468);
-    
-    // NFT Token ID
-    uint256 public constant POPPIES_TOKEN_ID = 0; // Update with actual Poppies token ID if different
+    uint256 public constant POPPIES_TOKEN_ID = 0; // Update if different
     
     // NFT Balance
     uint256 public poppiesNftBalance;
@@ -24,14 +22,14 @@ contract SlotMachine is Ownable, ReentrancyGuard, IERC1155Receiver {
     uint256 public constant DISCOUNTED_SPIN_COST = 0.01 ether;
     
     // PROBABILITIES (out of 10000 for precision)
-    uint256 public constant POPPIES_NFT_PROBABILITY = 1000; // 10% chance
-    uint256 public constant MAINNET_WL_PROBABILITY = 500; // 5% chance for mainnet WL
+    uint256 public constant POPPIES_NFT_PROBABILITY = 1000; // 10% for Poppies NFT
+    uint256 public constant MAINNET_WL_PROBABILITY = 500; // 5% for Poppies Mainnet WL
     
     // User states
     mapping(address => uint256) public freeSpins;
     mapping(address => uint256) public discountedSpins;
     mapping(address => bool) public hasDiscount;
-    mapping(address => bool) public hasMainnetWhitelist;
+    mapping(address => bool) public hasMainnetWhitelist; // Track mainnet WL winners
     
     // Reward pool
     uint256 public rewardPool;
@@ -55,7 +53,6 @@ contract SlotMachine is Ownable, ReentrancyGuard, IERC1155Receiver {
     event NFTsDeposited(address indexed nftContract, uint256 tokenId, uint256 amount);
     event MainnetWhitelistAwarded(address indexed winner);
     
-    // ✅ FIX: Add initialOwner parameter to constructor
     constructor(address initialOwner) Ownable(initialOwner) {
         rewardPool = 0;
         poppiesNftBalance = 0;
@@ -98,10 +95,10 @@ contract SlotMachine is Ownable, ReentrancyGuard, IERC1155Receiver {
         rewardPool += msg.value;
         emit RewardPoolUpdated(rewardPool);
         
-        // ✅ FIX: Generate random results using prevrandao instead of difficulty
+        // Generate random seed
         uint256 seed = uint256(keccak256(abi.encodePacked(
             block.timestamp,
-            block.prevrandao, // ✅ Changed from block.difficulty to block.prevrandao
+            block.prevrandao,
             msg.sender,
             rewardPool,
             block.number
@@ -118,24 +115,23 @@ contract SlotMachine is Ownable, ReentrancyGuard, IERC1155Receiver {
         
         // Check for Poppies NFT win (10% chance)
         bool poppiesNftWon = false;
-        if (poppiesNftBalance > 0) {
-            uint256 poppiesRoll = (seed / 2000) % 10000;
-            if (poppiesRoll < POPPIES_NFT_PROBABILITY) {
-                POPPIES_NFT.safeTransferFrom(address(this), msg.sender, POPPIES_TOKEN_ID, 1, "");
-                poppiesNftBalance--;
-                poppiesNftWon = true;
-                poppiesNftsAwarded++;
-                emit PoppiesNFTAwarded(msg.sender, POPPIES_TOKEN_ID, 1);
-            }
+        uint256 poppiesRoll = (seed / 2000) % 10000;
+        if (poppiesRoll < POPPIES_NFT_PROBABILITY && poppiesNftBalance > 0) {
+            // Transfer NFT immediately
+            POPPIES_NFT.safeTransferFrom(address(this), msg.sender, POPPIES_TOKEN_ID, 1, "");
+            poppiesNftBalance--;
+            poppiesNftsAwarded++;
+            poppiesNftWon = true;
+            emit PoppiesNFTAwarded(msg.sender, POPPIES_TOKEN_ID, 1);
         }
         
         // Check for Mainnet Whitelist win (5% chance)
-        bool mainnetWLWon = false;
-        if (!hasMainnetWhitelist[msg.sender]) {
+        bool mainnetWhitelistWon = false;
+        if (!hasMainnetWhitelist[msg.sender]) { // Only if they don't already have it
             uint256 wlRoll = (seed / 3000) % 10000;
             if (wlRoll < MAINNET_WL_PROBABILITY) {
                 hasMainnetWhitelist[msg.sender] = true;
-                mainnetWLWon = true;
+                mainnetWhitelistWon = true;
                 mainnetWhitelistsAwarded++;
                 emit MainnetWhitelistAwarded(msg.sender);
             }
@@ -166,7 +162,7 @@ contract SlotMachine is Ownable, ReentrancyGuard, IERC1155Receiver {
             discountApplied,
             newDiscountGranted,
             poppiesNftWon,
-            mainnetWLWon
+            mainnetWhitelistWon
         );
     }
     
@@ -187,11 +183,9 @@ contract SlotMachine is Ownable, ReentrancyGuard, IERC1155Receiver {
         pure 
         returns (uint256 monReward, uint256 extraSpins, bool newDiscountGranted) 
     {
-        // Check for matches
         bool match01 = keccak256(bytes(fruits[0])) == keccak256(bytes(fruits[1]));
         bool match12 = keccak256(bytes(fruits[1])) == keccak256(bytes(fruits[2]));
         
-        // REDUCED REWARDS (to compensate for 10% Poppies NFT + 5% Mainnet WL)
         // Three of a kind
         if (match01 && match12) {
             if (keccak256(bytes(fruits[0])) == keccak256(bytes("cherry"))) {
@@ -225,33 +219,28 @@ contract SlotMachine is Ownable, ReentrancyGuard, IERC1155Receiver {
         // Single fruit bonuses
         else {
             if (keccak256(bytes(fruits[0])) == keccak256(bytes("cherry"))) {
-                // 15% chance for single cherry bonus
                 uint256 cherryRoll = (seed / 500) % 100;
                 if (cherryRoll < 15) {
                     monReward = 0.018 ether; // 0.018 MON
                 }
             } else if (keccak256(bytes(fruits[0])) == keccak256(bytes("apple"))) {
-                // 10% chance for single apple bonus (free spin)
                 uint256 appleRoll = (seed / 600) % 100;
                 if (appleRoll < 10) {
                     extraSpins = 1;
                 }
             } else if (keccak256(bytes(fruits[0])) == keccak256(bytes("banana"))) {
-                // 8% chance for single banana bonus (discounted spins)
                 uint256 bananaRoll = (seed / 700) % 100;
                 if (bananaRoll < 8) {
                     newDiscountGranted = true;
                 }
             }
             
-            // 12% consolation prize for any other combination
             uint256 consolationRoll = (seed / 800) % 100;
             if (consolationRoll < 12 && monReward == 0 && extraSpins == 0 && !newDiscountGranted) {
                 monReward = 0.009 ether; // 0.009 MON consolation
             }
         }
         
-        // Random discount chance (5%)
         uint256 discountRoll = (seed / 100) % 100;
         if (discountRoll < 5 && !newDiscountGranted) {
             newDiscountGranted = true;
@@ -259,13 +248,9 @@ contract SlotMachine is Ownable, ReentrancyGuard, IERC1155Receiver {
     }
     
     function getSpinCost(address user) public view returns (uint256) {
-        if (freeSpins[user] > 0) {
-            return 0;
-        } else if (hasDiscount[user] && discountedSpins[user] > 0) {
-            return DISCOUNTED_SPIN_COST;
-        } else {
-            return SPIN_COST;
-        }
+        if (freeSpins[user] > 0) return 0;
+        if (hasDiscount[user] && discountedSpins[user] > 0) return DISCOUNTED_SPIN_COST;
+        return SPIN_COST;
     }
     
     function getRewardPool() external view returns (uint256) {
@@ -331,6 +316,7 @@ contract SlotMachine is Ownable, ReentrancyGuard, IERC1155Receiver {
     
     // Emergency function to withdraw NFTs if needed
     function emergencyWithdrawPoppiesNFT(uint256 amount) external onlyOwner {
+        require(amount <= poppiesNftBalance, "Insufficient NFTs");
         POPPIES_NFT.safeTransferFrom(address(this), owner(), POPPIES_TOKEN_ID, amount, "");
         poppiesNftBalance -= amount;
     }
