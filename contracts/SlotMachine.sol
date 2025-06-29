@@ -10,8 +10,8 @@ contract SlotMachine is Ownable, ReentrancyGuard, IERC1155Receiver {
     // Your pre-deployed NFT contract (ERC-1155)
     IERC1155 public constant NFT_CONTRACT = IERC1155(0x96F37136ed9653eb1d2D23cb86C18B8Af870e468);
     
-    // NFT details
-    uint256 public constant NFT_TOKEN_ID = 1; // Assuming token ID is 1
+    // NFT details - TOKEN ID = 0 (confirmed from explorer)
+    uint256 public constant NFT_TOKEN_ID = 0;
     uint256 public nftBalance; // How many NFTs this contract holds
     uint256 public nftsAwarded = 0;
     
@@ -50,11 +50,11 @@ contract SlotMachine is Ownable, ReentrancyGuard, IERC1155Receiver {
     }
     
     // Function for you to deposit NFTs into the contract
-    function depositNFTs(uint256 tokenId, uint256 amount) external onlyOwner {
+    function depositNFTs(uint256 amount) external onlyOwner {
         // Transfer NFTs from your wallet to this contract
-        NFT_CONTRACT.safeTransferFrom(msg.sender, address(this), tokenId, amount, "");
+        NFT_CONTRACT.safeTransferFrom(msg.sender, address(this), NFT_TOKEN_ID, amount, "");
         nftBalance += amount;
-        emit NFTsDeposited(tokenId, amount);
+        emit NFTsDeposited(NFT_TOKEN_ID, amount);
     }
     
     // Check how many NFTs are available
@@ -251,8 +251,8 @@ contract SlotMachine is Ownable, ReentrancyGuard, IERC1155Receiver {
     }
     
     // Emergency function to withdraw NFTs if needed
-    function emergencyWithdrawNFT(uint256 tokenId, uint256 amount) external onlyOwner {
-        NFT_CONTRACT.safeTransferFrom(address(this), owner(), tokenId, amount, "");
+    function emergencyWithdrawNFT(uint256 amount) external onlyOwner {
+        NFT_CONTRACT.safeTransferFrom(address(this), owner(), NFT_TOKEN_ID, amount, "");
         nftBalance -= amount;
     }
 }
