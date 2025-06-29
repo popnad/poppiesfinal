@@ -21,14 +21,19 @@ contract SlotMachine is Ownable, ReentrancyGuard, IERC1155Receiver {
     
     // Probabilities (out of 10000 for precision)
     uint256 public constant RARE_NFT_PROBABILITY = 1; // 0.01% chance for NFT
+    uint256 public constant MAINNET_WL_PROBABILITY = 500; // 5% chance for mainnet WL
     
     // User states
     mapping(address => uint256) public freeSpins;
     mapping(address => uint256) public discountedSpins;
     mapping(address => bool) public hasDiscount;
+    mapping(address => bool) public hasMainnetWhitelist; // NEW: Mainnet WL tracking
     
     // Reward pool
     uint256 public rewardPool;
+    
+    // Stats
+    uint256 public mainnetWhitelistsAwarded = 0;
     
     event SpinResult(
         address indexed user,
@@ -37,12 +42,14 @@ contract SlotMachine is Ownable, ReentrancyGuard, IERC1155Receiver {
         uint256 extraSpins,
         bool discountApplied,
         bool newDiscountGranted,
-        bool nftMinted
+        bool nftMinted,
+        bool mainnetWhitelistWon // NEW: Mainnet WL event
     );
     
     event RewardPoolUpdated(uint256 newBalance);
     event NFTAwarded(address indexed winner, uint256 tokenId, uint256 amount);
     event NFTsDeposited(uint256 tokenId, uint256 amount);
+    event MainnetWhitelistAwarded(address indexed winner); // NEW: Mainnet WL event
     
     constructor() {
         rewardPool = 0;
@@ -60,6 +67,11 @@ contract SlotMachine is Ownable, ReentrancyGuard, IERC1155Receiver {
     // Check how many NFTs are available
     function getAvailableNFTCount() external view returns (uint256) {
         return nftBalance;
+    }
+    
+    // NEW: Check if user has mainnet whitelist
+    function checkMainnetWhitelist(address user) external view returns (bool) {
+        return hasMainnetWhitelist[user];
     }
     
     function spin() external payable nonReentrant {
@@ -99,9 +111,8 @@ contract SlotMachine is Ownable, ReentrancyGuard, IERC1155Receiver {
         // Calculate rewards
         (uint256 monReward, uint256 extraSpins, bool newDiscountGranted) = calculateRewards(fruits, seed);
         
-        // Check for NFT win (very rare)
+        // Check for NFT win (0.01% chance)
         bool nftWon = false;
-        
         if (nftBalance > 0) {
             uint256 nftRoll = (seed / 1000) % 10000;
             if (nftRoll < RARE_NFT_PROBABILITY) {
@@ -112,6 +123,19 @@ contract SlotMachine is Ownable, ReentrancyGuard, IERC1155Receiver {
                 nftsAwarded++;
                 
                 emit NFTAwarded(msg.sender, NFT_TOKEN_ID, 1);
+            }
+        }
+        
+        // NEW: Check for Mainnet Whitelist win (5% chance)
+        bool mainnetWLWon = false;
+        if (!hasMainnetWhitelist[msg.sender]) { // Only if they don't already have it
+            uint256 wlRoll = (seed / 2000) % 10000;
+            if (wlRoll < MAINNET_WL_PROBABILITY) {
+                hasMainnetWhitelist[msg.sender] = true;
+                mainnetWLWon = true;
+                mainnetWhitelistsAwarded++;
+                
+                emit MainnetWhitelistAwarded(msg.sender);
             }
         }
         
@@ -138,7 +162,8 @@ contract SlotMachine is Ownable, ReentrancyGuard, IERC1155Receiver {
             extraSpins,
             discountApplied,
             newDiscountGranted,
-            nftWon
+            nftWon,
+            mainnetWLWon // NEW: Include mainnet WL in event
         );
     }
     
@@ -223,6 +248,22 @@ contract SlotMachine is Ownable, ReentrancyGuard, IERC1155Receiver {
         rewardPool -= amount;
         payable(owner()).transfer(amount);
         emit RewardPoolUpdated(rewardPool);
+    }
+    
+    // NEW: Owner function to manually grant mainnet whitelist (if needed)
+    function grantMainnetWhitelist(address user) external onlyOwner {
+        hasMainnetWhitelist[user] = true;
+        mainnetWhitelistsAwarded++;
+        emit MainnetWhitelistAwarded(user);
+    }
+    
+    // NEW: Get stats
+    function getStats() external view returns (
+        uint256 totalNFTsAwarded,
+        uint256 totalMainnetWLAwarded,
+        uint256 availableNFTs
+    ) {
+        return (nftsAwarded, mainnetWhitelistsAwarded, nftBalance);
     }
     
     // Required for receiving ERC-1155 NFTs
