@@ -4,21 +4,19 @@ pragma solidity ^0.8.19;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 
-contract SlotMachine is Ownable, ReentrancyGuard {
+contract SlotMachine is Ownable, ReentrancyGuard, IERC721Receiver {
     // Your pre-deployed NFT contract
     IERC721 public constant NFT_CONTRACT = IERC721(0x96F37136ed9653eb1d2D23cb86C18B8Af870e468);
-    
-    // Your wallet address (holds the 999 NFTs)
-    address public constant NFT_HOLDER = 0x...; // YOUR WALLET ADDRESS HERE
     
     // Spin costs
     uint256 public constant SPIN_COST = 0.1 ether;
     uint256 public constant DISCOUNTED_SPIN_COST = 0.01 ether;
     
     // NFT tracking
-    uint256 public nextNFTTokenId = 1; // Start from token ID 1
-    uint256 public constant MAX_NFTS = 999;
+    uint256[] public availableNFTs; // Array of token IDs available to win
+    uint256 public nftsAwarded = 0;
     
     // Probabilities (out of 10000 for precision)
     uint256 public constant RARE_NFT_PROBABILITY = 1; // 0.01% chance for NFT
@@ -44,9 +42,25 @@ contract SlotMachine is Ownable, ReentrancyGuard {
     
     event RewardPoolUpdated(uint256 newBalance);
     event NFTAwarded(address indexed winner, uint256 tokenId);
+    event NFTsDeposited(uint256[] tokenIds);
     
     constructor() {
         rewardPool = 0;
+    }
+    
+    // Function for you to deposit NFTs into the contract
+    function depositNFTs(uint256[] calldata tokenIds) external onlyOwner {
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            // Transfer NFT from your wallet to this contract
+            NFT_CONTRACT.transferFrom(msg.sender, address(this), tokenIds[i]);
+            availableNFTs.push(tokenIds[i]);
+        }
+        emit NFTsDeposited(tokenIds);
+    }
+    
+    // Check how many NFTs are available
+    function getAvailableNFTCount() external view returns (uint256) {
+        return availableNFTs.length;
     }
     
     function spin() external payable nonReentrant {
@@ -90,22 +104,23 @@ contract SlotMachine is Ownable, ReentrancyGuard {
         bool nftWon = false;
         uint256 nftTokenId = 0;
         
-        if (nextNFTTokenId <= MAX_NFTS) {
+        if (availableNFTs.length > 0) {
             uint256 nftRoll = (seed / 1000) % 10000;
             if (nftRoll < RARE_NFT_PROBABILITY) {
-                nftWon = true;
-                nftTokenId = nextNFTTokenId;
-                nextNFTTokenId++;
+                // Pick a random NFT from available ones
+                uint256 randomIndex = (seed / 2000) % availableNFTs.length;
+                nftTokenId = availableNFTs[randomIndex];
                 
-                // Transfer NFT from your wallet to winner
-                try NFT_CONTRACT.transferFrom(NFT_HOLDER, msg.sender, nftTokenId) {
-                    emit NFTAwarded(msg.sender, nftTokenId);
-                } catch {
-                    // If transfer fails, revert the NFT win
-                    nftWon = false;
-                    nftTokenId = 0;
-                    nextNFTTokenId--; // Revert the increment
-                }
+                // Remove from available array (swap with last element)
+                availableNFTs[randomIndex] = availableNFTs[availableNFTs.length - 1];
+                availableNFTs.pop();
+                
+                // Transfer NFT to winner
+                NFT_CONTRACT.transferFrom(address(this), msg.sender, nftTokenId);
+                nftWon = true;
+                nftsAwarded++;
+                
+                emit NFTAwarded(msg.sender, nftTokenId);
             }
         }
         
@@ -220,9 +235,18 @@ contract SlotMachine is Ownable, ReentrancyGuard {
         emit RewardPoolUpdated(rewardPool);
     }
     
-    // Emergency function to update NFT holder address if needed
-    function updateNFTHolder(address newHolder) external onlyOwner {
-        // This would require redeploying, but kept for reference
-        revert("NFT holder is hardcoded for security");
+    // Required for receiving NFTs
+    function onERC721Received(
+        address operator,
+        address from,
+        uint256 tokenId,
+        bytes calldata data
+    ) external override returns (bytes4) {
+        return this.onERC721Received.selector;
+    }
+    
+    // Emergency function to withdraw NFTs if needed
+    function emergencyWithdrawNFT(uint256 tokenId) external onlyOwner {
+        NFT_CONTRACT.transferFrom(address(this), owner(), tokenId);
     }
 }
