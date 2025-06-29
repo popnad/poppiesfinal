@@ -3,20 +3,21 @@ pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
+import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 
-contract SlotMachine is Ownable, ReentrancyGuard, IERC721Receiver {
-    // Your pre-deployed NFT contract
-    IERC721 public constant NFT_CONTRACT = IERC721(0x96F37136ed9653eb1d2D23cb86C18B8Af870e468);
+contract SlotMachine is Ownable, ReentrancyGuard, IERC1155Receiver {
+    // Your pre-deployed NFT contract (ERC-1155)
+    IERC1155 public constant NFT_CONTRACT = IERC1155(0x96F37136ed9653eb1d2D23cb86C18B8Af870e468);
+    
+    // NFT details
+    uint256 public constant NFT_TOKEN_ID = 1; // Assuming token ID is 1
+    uint256 public nftBalance; // How many NFTs this contract holds
+    uint256 public nftsAwarded = 0;
     
     // Spin costs
     uint256 public constant SPIN_COST = 0.1 ether;
     uint256 public constant DISCOUNTED_SPIN_COST = 0.01 ether;
-    
-    // NFT tracking
-    uint256[] public availableNFTs; // Array of token IDs available to win
-    uint256 public nftsAwarded = 0;
     
     // Probabilities (out of 10000 for precision)
     uint256 public constant RARE_NFT_PROBABILITY = 1; // 0.01% chance for NFT
@@ -36,31 +37,29 @@ contract SlotMachine is Ownable, ReentrancyGuard, IERC721Receiver {
         uint256 extraSpins,
         bool discountApplied,
         bool newDiscountGranted,
-        bool nftMinted,
-        uint256 nftTokenId
+        bool nftMinted
     );
     
     event RewardPoolUpdated(uint256 newBalance);
-    event NFTAwarded(address indexed winner, uint256 tokenId);
-    event NFTsDeposited(uint256[] tokenIds);
+    event NFTAwarded(address indexed winner, uint256 tokenId, uint256 amount);
+    event NFTsDeposited(uint256 tokenId, uint256 amount);
     
     constructor() {
         rewardPool = 0;
+        nftBalance = 0;
     }
     
     // Function for you to deposit NFTs into the contract
-    function depositNFTs(uint256[] calldata tokenIds) external onlyOwner {
-        for (uint256 i = 0; i < tokenIds.length; i++) {
-            // Transfer NFT from your wallet to this contract
-            NFT_CONTRACT.transferFrom(msg.sender, address(this), tokenIds[i]);
-            availableNFTs.push(tokenIds[i]);
-        }
-        emit NFTsDeposited(tokenIds);
+    function depositNFTs(uint256 tokenId, uint256 amount) external onlyOwner {
+        // Transfer NFTs from your wallet to this contract
+        NFT_CONTRACT.safeTransferFrom(msg.sender, address(this), tokenId, amount, "");
+        nftBalance += amount;
+        emit NFTsDeposited(tokenId, amount);
     }
     
     // Check how many NFTs are available
     function getAvailableNFTCount() external view returns (uint256) {
-        return availableNFTs.length;
+        return nftBalance;
     }
     
     function spin() external payable nonReentrant {
@@ -102,25 +101,17 @@ contract SlotMachine is Ownable, ReentrancyGuard, IERC721Receiver {
         
         // Check for NFT win (very rare)
         bool nftWon = false;
-        uint256 nftTokenId = 0;
         
-        if (availableNFTs.length > 0) {
+        if (nftBalance > 0) {
             uint256 nftRoll = (seed / 1000) % 10000;
             if (nftRoll < RARE_NFT_PROBABILITY) {
-                // Pick a random NFT from available ones
-                uint256 randomIndex = (seed / 2000) % availableNFTs.length;
-                nftTokenId = availableNFTs[randomIndex];
-                
-                // Remove from available array (swap with last element)
-                availableNFTs[randomIndex] = availableNFTs[availableNFTs.length - 1];
-                availableNFTs.pop();
-                
-                // Transfer NFT to winner
-                NFT_CONTRACT.transferFrom(address(this), msg.sender, nftTokenId);
+                // Transfer 1 NFT to winner
+                NFT_CONTRACT.safeTransferFrom(address(this), msg.sender, NFT_TOKEN_ID, 1, "");
+                nftBalance--;
                 nftWon = true;
                 nftsAwarded++;
                 
-                emit NFTAwarded(msg.sender, nftTokenId);
+                emit NFTAwarded(msg.sender, NFT_TOKEN_ID, 1);
             }
         }
         
@@ -147,8 +138,7 @@ contract SlotMachine is Ownable, ReentrancyGuard, IERC721Receiver {
             extraSpins,
             discountApplied,
             newDiscountGranted,
-            nftWon,
-            nftTokenId
+            nftWon
         );
     }
     
@@ -235,18 +225,34 @@ contract SlotMachine is Ownable, ReentrancyGuard, IERC721Receiver {
         emit RewardPoolUpdated(rewardPool);
     }
     
-    // Required for receiving NFTs
-    function onERC721Received(
+    // Required for receiving ERC-1155 NFTs
+    function onERC1155Received(
         address operator,
         address from,
-        uint256 tokenId,
+        uint256 id,
+        uint256 value,
         bytes calldata data
     ) external override returns (bytes4) {
-        return this.onERC721Received.selector;
+        return this.onERC1155Received.selector;
+    }
+    
+    function onERC1155BatchReceived(
+        address operator,
+        address from,
+        uint256[] calldata ids,
+        uint256[] calldata values,
+        bytes calldata data
+    ) external override returns (bytes4) {
+        return this.onERC1155BatchReceived.selector;
+    }
+    
+    function supportsInterface(bytes4 interfaceId) external view override returns (bool) {
+        return interfaceId == type(IERC1155Receiver).interfaceId;
     }
     
     // Emergency function to withdraw NFTs if needed
-    function emergencyWithdrawNFT(uint256 tokenId) external onlyOwner {
-        NFT_CONTRACT.transferFrom(address(this), owner(), tokenId);
+    function emergencyWithdrawNFT(uint256 tokenId, uint256 amount) external onlyOwner {
+        NFT_CONTRACT.safeTransferFrom(address(this), owner(), tokenId, amount, "");
+        nftBalance -= amount;
     }
 }
