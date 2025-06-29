@@ -7,28 +7,23 @@ import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 
 contract SlotMachine is Ownable, ReentrancyGuard, IERC1155Receiver {
-    // NFT Contracts
-    IERC1155 public constant CHERRY_CHARM_NFT = IERC1155(0x96F37136ed9653eb1d2D23cb86C18B8Af870e468);
-    IERC1155 public constant POPPIES_NFT = IERC1155(0x96F37136ed9653eb1d2D23cb86C18B8Af870e468); // Update with actual Poppies contract
+    // Poppies NFT Contract (only one NFT type as clarified)
+    IERC1155 public constant POPPIES_NFT = IERC1155(0x96F37136ed9653eb1d2D23cb86C18B8Af870e468);
     
-    // NFT Token IDs
-    uint256 public constant CHERRY_CHARM_TOKEN_ID = 0;
-    uint256 public constant POPPIES_TOKEN_ID = 1; // Update with actual Poppies token ID
+    // NFT Token ID
+    uint256 public constant POPPIES_TOKEN_ID = 0; // Update with actual Poppies token ID if different
     
-    // NFT Balances
-    uint256 public cherryCharmNftBalance;
+    // NFT Balance
     uint256 public poppiesNftBalance;
     
     // NFT Stats
-    uint256 public cherryCharmNftsAwarded = 0;
     uint256 public poppiesNftsAwarded = 0;
     
     // Spin costs
     uint256 public constant SPIN_COST = 0.1 ether;
     uint256 public constant DISCOUNTED_SPIN_COST = 0.01 ether;
     
-    // NEW PROBABILITIES (out of 10000 for precision)
-    uint256 public constant CHERRY_CHARM_NFT_PROBABILITY = 500; // 5% chance
+    // PROBABILITIES (out of 10000 for precision)
     uint256 public constant POPPIES_NFT_PROBABILITY = 1000; // 10% chance
     uint256 public constant MAINNET_WL_PROBABILITY = 500; // 5% chance for mainnet WL
     
@@ -51,28 +46,19 @@ contract SlotMachine is Ownable, ReentrancyGuard, IERC1155Receiver {
         uint256 extraSpins,
         bool discountApplied,
         bool newDiscountGranted,
-        bool cherryCharmNftWon,
         bool poppiesNftWon,
         bool mainnetWhitelistWon
     );
     
     event RewardPoolUpdated(uint256 newBalance);
-    event CherryCharmNFTAwarded(address indexed winner, uint256 tokenId, uint256 amount);
     event PoppiesNFTAwarded(address indexed winner, uint256 tokenId, uint256 amount);
     event NFTsDeposited(address indexed nftContract, uint256 tokenId, uint256 amount);
     event MainnetWhitelistAwarded(address indexed winner);
     
-    constructor() {
+    // ✅ FIX: Add initialOwner parameter to constructor
+    constructor(address initialOwner) Ownable(initialOwner) {
         rewardPool = 0;
-        cherryCharmNftBalance = 0;
         poppiesNftBalance = 0;
-    }
-    
-    // Function to deposit CherryCharm NFTs
-    function depositCherryCharmNFTs(uint256 amount) external onlyOwner {
-        CHERRY_CHARM_NFT.safeTransferFrom(msg.sender, address(this), CHERRY_CHARM_TOKEN_ID, amount, "");
-        cherryCharmNftBalance += amount;
-        emit NFTsDeposited(address(CHERRY_CHARM_NFT), CHERRY_CHARM_TOKEN_ID, amount);
     }
     
     // Function to deposit Poppies NFTs
@@ -82,9 +68,9 @@ contract SlotMachine is Ownable, ReentrancyGuard, IERC1155Receiver {
         emit NFTsDeposited(address(POPPIES_NFT), POPPIES_TOKEN_ID, amount);
     }
     
-    // Check available NFT counts
-    function getAvailableNFTCounts() external view returns (uint256 cherryCharm, uint256 poppies) {
-        return (cherryCharmNftBalance, poppiesNftBalance);
+    // Check available NFT count
+    function getAvailablePoppiesNFTCount() external view returns (uint256) {
+        return poppiesNftBalance;
     }
     
     // Check if user has mainnet whitelist
@@ -112,12 +98,13 @@ contract SlotMachine is Ownable, ReentrancyGuard, IERC1155Receiver {
         rewardPool += msg.value;
         emit RewardPoolUpdated(rewardPool);
         
-        // Generate random results
+        // ✅ FIX: Generate random results using prevrandao instead of difficulty
         uint256 seed = uint256(keccak256(abi.encodePacked(
             block.timestamp,
-            block.difficulty,
+            block.prevrandao, // ✅ Changed from block.difficulty to block.prevrandao
             msg.sender,
-            rewardPool
+            rewardPool,
+            block.number
         )));
         
         // Generate fruit combination
@@ -128,19 +115,6 @@ contract SlotMachine is Ownable, ReentrancyGuard, IERC1155Receiver {
         
         // Calculate MON rewards and spins
         (uint256 monReward, uint256 extraSpins, bool newDiscountGranted) = calculateRewards(fruits, seed);
-        
-        // Check for CherryCharm NFT win (5% chance)
-        bool cherryCharmNftWon = false;
-        if (cherryCharmNftBalance > 0) {
-            uint256 cherryCharmRoll = (seed / 1000) % 10000;
-            if (cherryCharmRoll < CHERRY_CHARM_NFT_PROBABILITY) {
-                CHERRY_CHARM_NFT.safeTransferFrom(address(this), msg.sender, CHERRY_CHARM_TOKEN_ID, 1, "");
-                cherryCharmNftBalance--;
-                cherryCharmNftWon = true;
-                cherryCharmNftsAwarded++;
-                emit CherryCharmNFTAwarded(msg.sender, CHERRY_CHARM_TOKEN_ID, 1);
-            }
-        }
         
         // Check for Poppies NFT win (10% chance)
         bool poppiesNftWon = false;
@@ -191,7 +165,6 @@ contract SlotMachine is Ownable, ReentrancyGuard, IERC1155Receiver {
             extraSpins,
             discountApplied,
             newDiscountGranted,
-            cherryCharmNftWon,
             poppiesNftWon,
             mainnetWLWon
         );
@@ -217,40 +190,70 @@ contract SlotMachine is Ownable, ReentrancyGuard, IERC1155Receiver {
         // Check for matches
         bool match01 = keccak256(bytes(fruits[0])) == keccak256(bytes(fruits[1]));
         bool match12 = keccak256(bytes(fruits[1])) == keccak256(bytes(fruits[2]));
-        bool match02 = keccak256(bytes(fruits[0])) == keccak256(bytes(fruits[2]));
         
-        // NEW REDUCED REWARDS (10% lower than before)
+        // REDUCED REWARDS (to compensate for 10% Poppies NFT + 5% Mainnet WL)
         // Three of a kind
         if (match01 && match12) {
             if (keccak256(bytes(fruits[0])) == keccak256(bytes("cherry"))) {
-                monReward = 0.045 ether; // Was 0.05, now 0.045 (10% reduction)
+                monReward = 0.045 ether; // 0.45 MON
                 extraSpins = 2;
             } else if (keccak256(bytes(fruits[0])) == keccak256(bytes("apple"))) {
-                monReward = 0.018 ether; // Was 0.02, now 0.018 (10% reduction)
+                monReward = 0.027 ether; // 0.27 MON
                 extraSpins = 3;
             } else if (keccak256(bytes(fruits[0])) == keccak256(bytes("banana"))) {
-                monReward = 0.0135 ether; // Was 0.015, now 0.0135 (10% reduction)
+                monReward = 0.018 ether; // 0.18 MON
                 extraSpins = 1;
             } else if (keccak256(bytes(fruits[0])) == keccak256(bytes("lemon"))) {
-                monReward = 0.0027 ether; // Was 0.003, now 0.0027 (10% reduction)
+                monReward = 0.0135 ether; // 0.135 MON
             }
         }
         // Two of a kind (consecutive from left)
         else if (match01) {
             if (keccak256(bytes(fruits[0])) == keccak256(bytes("cherry"))) {
-                monReward = 0.036 ether; // Was 0.04, now 0.036 (10% reduction)
+                monReward = 0.018 ether; // 0.18 MON
                 extraSpins = 1;
             } else if (keccak256(bytes(fruits[0])) == keccak256(bytes("apple"))) {
-                monReward = 0.009 ether; // Was 0.01, now 0.009 (10% reduction)
-                extraSpins = 1;
+                monReward = 0.0135 ether; // 0.135 MON
             } else if (keccak256(bytes(fruits[0])) == keccak256(bytes("banana"))) {
-                monReward = 0.0045 ether; // Was 0.005, now 0.0045 (10% reduction)
+                monReward = 0.009 ether; // 0.09 MON
+                extraSpins = 2;
+            } else if (keccak256(bytes(fruits[0])) == keccak256(bytes("lemon"))) {
+                monReward = 0.0045 ether; // 0.045 MON
+                extraSpins = 1;
+            }
+        }
+        // Single fruit bonuses
+        else {
+            if (keccak256(bytes(fruits[0])) == keccak256(bytes("cherry"))) {
+                // 15% chance for single cherry bonus
+                uint256 cherryRoll = (seed / 500) % 100;
+                if (cherryRoll < 15) {
+                    monReward = 0.018 ether; // 0.018 MON
+                }
+            } else if (keccak256(bytes(fruits[0])) == keccak256(bytes("apple"))) {
+                // 10% chance for single apple bonus (free spin)
+                uint256 appleRoll = (seed / 600) % 100;
+                if (appleRoll < 10) {
+                    extraSpins = 1;
+                }
+            } else if (keccak256(bytes(fruits[0])) == keccak256(bytes("banana"))) {
+                // 8% chance for single banana bonus (discounted spins)
+                uint256 bananaRoll = (seed / 700) % 100;
+                if (bananaRoll < 8) {
+                    newDiscountGranted = true;
+                }
+            }
+            
+            // 12% consolation prize for any other combination
+            uint256 consolationRoll = (seed / 800) % 100;
+            if (consolationRoll < 12 && monReward == 0 && extraSpins == 0 && !newDiscountGranted) {
+                monReward = 0.009 ether; // 0.009 MON consolation
             }
         }
         
-        // Random discount chance (8% - slightly higher to compensate)
+        // Random discount chance (5%)
         uint256 discountRoll = (seed / 100) % 100;
-        if (discountRoll < 8) {
+        if (discountRoll < 5 && !newDiscountGranted) {
             newDiscountGranted = true;
         }
     }
@@ -290,17 +293,13 @@ contract SlotMachine is Ownable, ReentrancyGuard, IERC1155Receiver {
     
     // Get comprehensive stats
     function getStats() external view returns (
-        uint256 totalCherryCharmNFTsAwarded,
         uint256 totalPoppiesNFTsAwarded,
         uint256 totalMainnetWLAwarded,
-        uint256 availableCherryCharmNFTs,
         uint256 availablePoppiesNFTs
     ) {
         return (
-            cherryCharmNftsAwarded, 
             poppiesNftsAwarded, 
             mainnetWhitelistsAwarded, 
-            cherryCharmNftBalance, 
             poppiesNftBalance
         );
     }
@@ -330,12 +329,7 @@ contract SlotMachine is Ownable, ReentrancyGuard, IERC1155Receiver {
         return interfaceId == type(IERC1155Receiver).interfaceId;
     }
     
-    // Emergency functions to withdraw NFTs if needed
-    function emergencyWithdrawCherryCharmNFT(uint256 amount) external onlyOwner {
-        CHERRY_CHARM_NFT.safeTransferFrom(address(this), owner(), CHERRY_CHARM_TOKEN_ID, amount, "");
-        cherryCharmNftBalance -= amount;
-    }
-    
+    // Emergency function to withdraw NFTs if needed
     function emergencyWithdrawPoppiesNFT(uint256 amount) external onlyOwner {
         POPPIES_NFT.safeTransferFrom(address(this), owner(), POPPIES_TOKEN_ID, amount, "");
         poppiesNftBalance -= amount;
