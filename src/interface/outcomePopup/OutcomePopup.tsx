@@ -24,10 +24,11 @@ interface OutcomePopupProps {
   monReward: string;
   extraSpins: number;
   nftMinted: boolean;
+  rarestPending?: boolean;
   txHash: string;
 }
 
-const OutcomePopup = ({ combination, monReward, extraSpins, nftMinted, txHash }: OutcomePopupProps) => {
+const OutcomePopup = ({ combination, monReward, extraSpins, nftMinted, rarestPending, txHash }: OutcomePopupProps) => {
   const { setOutcomePopup } = useGame();
 
   const explorerUrl = `${MONAD_TESTNET.blockExplorers.default.url}/tx/${txHash}`;
@@ -64,8 +65,14 @@ const OutcomePopup = ({ combination, monReward, extraSpins, nftMinted, txHash }:
   const getRewardText = () => {
     const rewards = [];
     
+    // Check for Poppies NFT win
     if (nftMinted) {
-      rewards.push('🎉 LEGENDARY NFT WON! 🍒🍒🍒');
+      rewards.push('🎉 POPPIES NFT WON! 🌸');
+    }
+    
+    // Check for rarest win pending
+    if (rarestPending) {
+      rewards.push('🏆 RAREST WIN PENDING! Contact admin to claim your ultra-rare reward!');
     }
     
     if (parseFloat(monReward) > 0) {
@@ -127,7 +134,8 @@ const OutcomePopup = ({ combination, monReward, extraSpins, nftMinted, txHash }:
               <div 
                 key={index} 
                 className={`outcome-reward ${
-                  reward.includes('LEGENDARY') ? 'legendary' :
+                  reward.includes('POPPIES NFT') ? 'poppies-nft' :
+                  reward.includes('RAREST WIN') ? 'rarest-win' :
                   reward.includes('Won:') && reward.includes('MON') ? 'mon-reward' :
                   reward.includes('Free Spins') ? 'free-spins' :
                   'no-reward'

@@ -122,6 +122,18 @@
   color: #6f42c1 !important;
 }
 
+.nft-balance {
+  color: #ff6b9d !important;
+}
+
+.nft-awarded {
+  color: #c44569 !important;
+}
+
+.rarest-wins {
+  color: #ffd700 !important;
+}
+
 .wallet-actions {
   display: flex;
   gap: 8px;

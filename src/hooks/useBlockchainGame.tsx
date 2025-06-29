@@ -18,26 +18,34 @@ import { useEffect, useState, useCallback } from 'react';
 import { usePrivy, useWallets } from '@privy-io/react-auth';
 import { ethers } from 'ethers';
 
+// Updated ABI for your new contract
 const SLOT_MACHINE_ABI = [
   {"inputs":[],"name":"fundContract","outputs":[],"stateMutability":"payable","type":"function"},
   {"inputs":[],"name":"spin","outputs":[],"stateMutability":"payable","type":"function"},
-  {"inputs":[{"internalType":"address","name":"_nftContract","type":"address"}],"stateMutability":"nonpayable","type":"constructor"},
-  {"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"newBalance","type":"uint256"}],"name":"RewardPoolUpdated","type":"event"},
-  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"string","name":"combination","type":"string"},{"indexed":false,"internalType":"uint256","name":"monReward","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"extraSpins","type":"uint256"},{"indexed":false,"internalType":"bool","name":"discountApplied","type":"bool"},{"indexed":false,"internalType":"bool","name":"newDiscountGranted","type":"bool"},{"indexed":false,"internalType":"bool","name":"nftMinted","type":"bool"}],"name":"SpinResult","type":"event"},
   {"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"withdraw","outputs":[],"stateMutability":"nonpayable","type":"function"},
   {"inputs":[],"name":"DISCOUNTED_SPIN_COST","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
   {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"discountedSpins","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
   {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"freeSpins","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
   {"inputs":[],"name":"getRewardPool","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"address","name":"user","type":"address"}],"name":"getSpinCost","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"getStats","outputs":[{"internalType":"uint256","name":"totalPoppiesNFTsAwarded","type":"uint256"},{"internalType":"uint256","name":"totalRarestWins","type":"uint256"},{"internalType":"uint256","name":"availablePoppiesNFTs","type":"uint256"}],"stateMutability":"view","type":"function"},
   {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"hasDiscount","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},
-  {"inputs":[],"name":"nftContract","outputs":[{"internalType":"contract CherryCharmNFT","name":"","type":"address"}],"stateMutability":"view","type":"function"},
   {"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
-  {"inputs":[],"name":"RARE_NFT_PROBABILITY","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
   {"inputs":[],"name":"rewardPool","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-  {"inputs":[],"name":"SPIN_COST","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}
+  {"inputs":[],"name":"SPIN_COST","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"POPPIES_NFT","outputs":[{"internalType":"contract IERC1155","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"POPPIES_TOKEN_ID","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"poppiesNftBalance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"poppiesNftsAwarded","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"rarestWins","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"string","name":"combination","type":"string"},{"indexed":false,"internalType":"uint256","name":"monReward","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"extraSpins","type":"uint256"},{"indexed":false,"internalType":"bool","name":"discountApplied","type":"bool"},{"indexed":false,"internalType":"bool","name":"newDiscountGranted","type":"bool"},{"indexed":false,"internalType":"bool","name":"poppiesNftWon","type":"bool"},{"indexed":false,"internalType":"bool","name":"rarestPending","type":"bool"}],"name":"SpinResult","type":"event"},
+  {"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"newBalance","type":"uint256"}],"name":"RewardPoolUpdated","type":"event"},
+  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"winner","type":"address"},{"indexed":false,"internalType":"uint256","name":"tokenId","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"PoppiesNFTAwarded","type":"event"},
+  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"winner","type":"address"}],"name":"RarestWinPending","type":"event"}
 ];
 
-const SLOT_MACHINE_ADDRESS = '0xc66f746F6Bbef6533c6cd9AE73B290237c228cE5';
+// Updated contract address
+const SLOT_MACHINE_ADDRESS = '0xCc53BEE0772B8A0Be08BCE3DD404bFCAC85E1635';
 
 // Monad Testnet configuration - Chain ID 10143
 export const MONAD_TESTNET = {
@@ -82,6 +90,11 @@ export function useBlockchainGame() {
   const [hasDiscount, setHasDiscount] = useState<boolean>(false);
   const [rewardPool, setRewardPool] = useState<string>('0');
   const [networkError, setNetworkError] = useState<boolean>(false);
+
+  // New state for NFT and stats
+  const [poppiesNftBalance, setPoppiesNftBalance] = useState<number>(0);
+  const [poppiesNftsAwarded, setPoppiesNftsAwarded] = useState<number>(0);
+  const [rarestWins, setRarestWins] = useState<number>(0);
 
   // New state for insufficient funds
   const [showInsufficientFunds, setShowInsufficientFunds] = useState<boolean>(false);
@@ -157,7 +170,7 @@ export function useBlockchainGame() {
           
           const slotContract = new ethers.Contract(SLOT_MACHINE_ADDRESS, SLOT_MACHINE_ABI, ethersSigner);
           setContract(slotContract);
-          console.log('Contract initialized');
+          console.log('Contract initialized with new address:', SLOT_MACHINE_ADDRESS);
           
           setNetworkError(false);
         } catch (error) {
@@ -188,11 +201,18 @@ export function useBlockchainGame() {
         
         // Fetch contract state with parallel calls for speed
         try {
-          const [freeSpinsResult, discountedSpinsResult, hasDiscountResult, rewardPoolResult] = await Promise.allSettled([
+          const [
+            freeSpinsResult, 
+            discountedSpinsResult, 
+            hasDiscountResult, 
+            rewardPoolResult,
+            statsResult
+          ] = await Promise.allSettled([
             contract.freeSpins(walletAddress),
             contract.discountedSpins(walletAddress),
             contract.hasDiscount(walletAddress),
-            contract.getRewardPool()
+            contract.getRewardPool(),
+            contract.getStats()
           ]);
 
           if (freeSpinsResult.status === 'fulfilled') {
@@ -206,6 +226,12 @@ export function useBlockchainGame() {
           }
           if (rewardPoolResult.status === 'fulfilled') {
             setRewardPool(ethers.formatEther(rewardPoolResult.value));
+          }
+          if (statsResult.status === 'fulfilled') {
+            const [totalPoppiesNFTsAwarded, totalRarestWins, availablePoppiesNFTs] = statsResult.value;
+            setPoppiesNftsAwarded(Number(totalPoppiesNFTsAwarded));
+            setRarestWins(Number(totalRarestWins));
+            setPoppiesNftBalance(Number(availablePoppiesNFTs));
           }
         } catch (error) {
           console.error('Error fetching contract state:', error);
@@ -226,42 +252,42 @@ export function useBlockchainGame() {
 
   // Check if user has sufficient funds for spinning (with realistic gas estimation)
   const checkSufficientFunds = useCallback(async () => {
-    if (!monBalance || !authenticated || !provider) return false;
+    if (!monBalance || !authenticated || !provider || !contract || !walletAddress) return false;
     
     const balance = parseFloat(monBalance);
-    let spinCost = 0.1; // Default spin cost
     
-    if (freeSpins > 0) {
-      spinCost = 0; // Free spin
-    } else if (hasDiscount && discountedSpins > 0) {
-      spinCost = 0.01; // Discounted spin
+    try {
+      // Get actual spin cost from contract
+      const spinCostWei = await contract.getSpinCost(walletAddress);
+      const spinCost = parseFloat(ethers.formatEther(spinCostWei));
+      
+      // Calculate realistic gas cost for Monad testnet
+      const gasLimit = BigInt(1000000);
+      const maxFeePerGas = ethers.parseUnits('1000', 'gwei');
+      
+      const estimatedGasCostWei = gasLimit * maxFeePerGas;
+      const estimatedGasCost = parseFloat(ethers.formatEther(estimatedGasCostWei));
+      
+      const totalRequired = spinCost + estimatedGasCost;
+      
+      console.log('💰 Fund check:', {
+        balance: balance.toFixed(6),
+        spinCost: spinCost.toFixed(6),
+        estimatedGasCost: estimatedGasCost.toFixed(6),
+        totalRequired: totalRequired.toFixed(6),
+        sufficient: balance >= totalRequired
+      });
+      
+      return balance >= totalRequired;
+    } catch (error) {
+      console.error('Error checking sufficient funds:', error);
+      return false;
     }
-    
-    // Calculate realistic gas cost for Monad testnet
-    // Gas limit: 1,000,000, Max fee: 1000 gwei = very expensive!
-    const gasLimit = BigInt(1000000);
-    const maxFeePerGas = ethers.parseUnits('1000', 'gwei'); // This returns BigInt
-    
-    // ✅ Fix: Convert BigInt to number properly for calculation
-    const estimatedGasCostWei = gasLimit * maxFeePerGas;
-    const estimatedGasCost = parseFloat(ethers.formatEther(estimatedGasCostWei));
-    
-    const totalRequired = spinCost + estimatedGasCost;
-    
-    console.log('💰 Fund check:', {
-      balance: balance.toFixed(6),
-      spinCost: spinCost.toFixed(6),
-      estimatedGasCost: estimatedGasCost.toFixed(6),
-      totalRequired: totalRequired.toFixed(6),
-      sufficient: balance >= totalRequired
-    });
-    
-    return balance >= totalRequired;
-  }, [monBalance, freeSpins, hasDiscount, discountedSpins, authenticated, provider]);
+  }, [monBalance, authenticated, provider, contract, walletAddress]);
 
   // REAL blockchain spin function
   const spin = useCallback(async () => {
-    if (!contract || !signer || !provider) {
+    if (!contract || !signer || !provider || !walletAddress) {
       console.error('Contract not ready');
       return null;
     }
@@ -274,36 +300,23 @@ export function useBlockchainGame() {
     // Check for sufficient funds before attempting spin
     const hasSufficientFunds = await checkSufficientFunds();
     if (!hasSufficientFunds) {
-      const spinCost = freeSpins > 0 ? 0 : (hasDiscount && discountedSpins > 0) ? 0.01 : 0.1;
-      const gasEstimate = 1; // Rough estimate for display
-      const requiredAmount = freeSpins > 0 ? `~${gasEstimate} MON (gas only)` : 
-                           `~${(spinCost + gasEstimate).toFixed(2)} MON (${spinCost} + gas)`;
-      
-      setInsufficientFundsData({
-        currentBalance: monBalance || '0',
-        requiredAmount: requiredAmount
-      });
-      setShowInsufficientFunds(true);
+      console.log('❌ Insufficient funds - showing popup');
+      showInsufficientFundsPopup();
       return null;
     }
-    
+
     try {
-      // Determine spin cost
-      let cost = ethers.parseEther('0.1'); // Default spin cost
-      if (freeSpins > 0) {
-        cost = ethers.parseEther('0');
-      } else if (hasDiscount && discountedSpins > 0) {
-        cost = ethers.parseEther('0.01'); // Discounted spin cost
-      }
+      // Get spin cost from contract
+      const spinCostWei = await contract.getSpinCost(walletAddress);
       
-      console.log(`🎰 Starting blockchain spin with cost: ${ethers.formatEther(cost)} MON`);
+      console.log(`🎰 Starting blockchain spin with cost: ${ethers.formatEther(spinCostWei)} MON`);
       console.log(`📊 Current state - Free: ${freeSpins}, Discounted: ${discountedSpins}, HasDiscount: ${hasDiscount}`);
       
       // Get gas settings
       const gasSettings = await getDynamicGasSettings(provider);
       
       const txParams = {
-        value: cost,
+        value: spinCostWei,
         ...gasSettings
       };
       
@@ -345,7 +358,15 @@ export function useBlockchainGame() {
       }
       
       if (spinResultEvent) {
-        const { combination, monReward, extraSpins, nftMinted, discountApplied, newDiscountGranted } = spinResultEvent.args;
+        const { 
+          combination, 
+          monReward, 
+          extraSpins, 
+          poppiesNftWon, 
+          rarestPending,
+          discountApplied, 
+          newDiscountGranted 
+        } = spinResultEvent.args;
         
         // Parse combination into fruit array
         const fruits = combination.split('|');
@@ -355,7 +376,8 @@ export function useBlockchainGame() {
           combination: fruits,
           monReward: rewardAmount,
           extraSpins: Number(extraSpins),
-          nftMinted,
+          nftMinted: poppiesNftWon, // Poppies NFT won
+          rarestPending: rarestPending, // Rarest win pending
           discountApplied,
           newDiscountGranted,
           txHash: receipt.hash
@@ -365,7 +387,8 @@ export function useBlockchainGame() {
           combination: fruits.join(' | '),
           monReward: rewardAmount + ' MON',
           extraSpins: Number(extraSpins),
-          nftMinted: nftMinted ? 'YES' : 'NO',
+          poppiesNftWon: poppiesNftWon ? 'YES' : 'NO',
+          rarestPending: rarestPending ? 'YES' : 'NO',
           discountApplied: discountApplied ? 'YES' : 'NO',
           newDiscountGranted: newDiscountGranted ? 'YES' : 'NO',
           txHash: receipt.hash
@@ -387,16 +410,7 @@ export function useBlockchainGame() {
       console.error('❌ Blockchain spin failed:', error);
       
       if (error.code === 'INSUFFICIENT_FUNDS' || error.message?.includes('insufficient funds')) {
-        const spinCost = freeSpins > 0 ? 0 : (hasDiscount && discountedSpins > 0) ? 0.01 : 0.1;
-        const gasEstimate = 1; // Rough estimate for display
-        const requiredAmount = freeSpins > 0 ? `~${gasEstimate} MON (gas only)` : 
-                             `~${(spinCost + gasEstimate).toFixed(2)} MON (${spinCost} + gas)`;
-        
-        setInsufficientFundsData({
-          currentBalance: monBalance || '0',
-          requiredAmount: requiredAmount
-        });
-        setShowInsufficientFunds(true);
+        showInsufficientFundsPopup();
       } else if (error.code === 'USER_REJECTED') {
         console.error('❌ Transaction cancelled');
       } else if (error.message?.includes('execution reverted')) {
@@ -405,13 +419,27 @@ export function useBlockchainGame() {
       
       return null;
     }
-  }, [contract, signer, provider, freeSpins, hasDiscount, discountedSpins, networkError, fetchState, getDynamicGasSettings, checkSufficientFunds, monBalance]);
+  }, [contract, signer, provider, walletAddress, freeSpins, hasDiscount, discountedSpins, networkError, fetchState, getDynamicGasSettings, checkSufficientFunds]);
 
   const getSpinCost = useCallback(() => {
     if (freeSpins > 0) return 'Free';
     if (hasDiscount && discountedSpins > 0) return '0.01 MON';
     return '0.1 MON';
   }, [freeSpins, hasDiscount, discountedSpins]);
+
+  // Function to show insufficient funds popup manually
+  const showInsufficientFundsPopup = useCallback(() => {
+    const spinCost = freeSpins > 0 ? 0 : (hasDiscount && discountedSpins > 0) ? 0.01 : 0.1;
+    const gasEstimate = 1; // Rough estimate for display
+    const requiredAmount = freeSpins > 0 ? `~${gasEstimate} MON (gas only)` : 
+                         `~${(spinCost + gasEstimate).toFixed(2)} MON (${spinCost} + gas)`;
+    
+    setInsufficientFundsData({
+      currentBalance: monBalance || '0',
+      requiredAmount: requiredAmount
+    });
+    setShowInsufficientFunds(true);
+  }, [freeSpins, hasDiscount, discountedSpins, monBalance]);
 
   const handleInsufficientFundsClose = useCallback(() => {
     setShowInsufficientFunds(false);
@@ -439,6 +467,10 @@ export function useBlockchainGame() {
     hasDiscount,
     rewardPool,
     networkError,
+    // New NFT and stats data
+    poppiesNftBalance,
+    poppiesNftsAwarded,
+    rarestWins,
     spin,
     getSpinCost,
     refreshState: fetchState,

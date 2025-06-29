@@ -148,21 +148,41 @@
   }
 }
 
-.outcome-reward.legendary {
-  background: linear-gradient(135deg, #ff6b35, #f7931e);
+.outcome-reward.poppies-nft {
+  background: linear-gradient(135deg, #ff6b9d, #c44569);
   color: white;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
-  box-shadow: 0 6px 20px rgba(255, 107, 53, 0.5);
-  animation: legendaryGlow 1.5s ease-in-out infinite alternate;
+  box-shadow: 0 6px 20px rgba(255, 107, 157, 0.5);
+  animation: poppiesGlow 1.5s ease-in-out infinite alternate;
 }
 
-@keyframes legendaryGlow {
+@keyframes poppiesGlow {
   from { 
-    box-shadow: 0 6px 20px rgba(255, 107, 53, 0.5);
+    box-shadow: 0 6px 20px rgba(255, 107, 157, 0.5);
     transform: scale(1);
   }
   to { 
-    box-shadow: 0 8px 30px rgba(255, 107, 53, 0.7);
+    box-shadow: 0 8px 30px rgba(255, 107, 157, 0.7);
+    transform: scale(1.02);
+  }
+}
+
+.outcome-reward.rarest-win {
+  background: linear-gradient(135deg, #ffd700, #ff8c00);
+  color: white;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 6px 20px rgba(255, 215, 0, 0.5);
+  animation: rarestGlow 1.5s ease-in-out infinite alternate;
+  font-size: min(3.5vw, 18px);
+}
+
+@keyframes rarestGlow {
+  from { 
+    box-shadow: 0 6px 20px rgba(255, 215, 0, 0.5);
+    transform: scale(1);
+  }
+  to { 
+    box-shadow: 0 8px 30px rgba(255, 215, 0, 0.7);
     transform: scale(1.02);
   }
 }
@@ -253,6 +273,10 @@
   }
   
   .outcome-combination-text {
+    font-size: 16px;
+  }
+  
+  .outcome-reward.rarest-win {
     font-size: 16px;
   }
 }

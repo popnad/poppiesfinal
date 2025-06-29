@@ -32,6 +32,9 @@ const WalletWidget = () => {
     discountedSpins,
     hasDiscount,
     rewardPool,
+    poppiesNftBalance,
+    poppiesNftsAwarded,
+    rarestWins,
     getSpinCost,
     refreshState,
   } = useBlockchainGame();
@@ -84,6 +87,18 @@ const WalletWidget = () => {
           <div className="wallet-detail-row">
             <span>Reward Pool:</span>
             <span className="reward-pool">{parseFloat(rewardPool || '0').toFixed(3)} MON</span>
+          </div>
+          <div className="wallet-detail-row">
+            <span>Available Poppies NFTs:</span>
+            <span className="nft-balance">{poppiesNftBalance}</span>
+          </div>
+          <div className="wallet-detail-row">
+            <span>Total NFTs Awarded:</span>
+            <span className="nft-awarded">{poppiesNftsAwarded}</span>
+          </div>
+          <div className="wallet-detail-row">
+            <span>Rarest Wins:</span>
+            <span className="rarest-wins">{rarestWins}</span>
           </div>
           <div className="wallet-actions">
             <button className="wallet-refresh-btn" onClick={handleRefresh}>

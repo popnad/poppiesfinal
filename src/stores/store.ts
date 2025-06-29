@@ -24,6 +24,7 @@ interface OutcomeData {
   monReward: string;
   extraSpins: number;
   nftMinted: boolean;
+  rarestPending?: boolean;
   txHash: string;
 }
 
